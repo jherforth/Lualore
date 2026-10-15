@@ -80,6 +80,30 @@ plus three `skyhouse` variants — sharing two noises:
 - Sky Folk are spawned once per built site (`sky_villages.spawn_sky_folk`),
   at the site centre rather than at a random patch of crystal grass.
 
+## Villages founded by sky portals
+
+Sky portals (`portal/SKY_PORTAL.md`) lead to a sky village, and found one
+when none is in reach, through `lualore.floating_buildings.found_at(x, z,
+opts)`. That runs the same `build_site` as the grid, with three options the
+grid never passes:
+
+- `houses`: how many houses to aim for (a portal asks for 18; the grid rolls
+  2-6).
+- `max_radius`: the cluster radius cap (the grid's is 46).
+- `tries`: placement attempts per house (the grid uses 8).
+
+A grid-built site comes out exactly as before: the house roll still runs,
+and is only overridden when `houses` is passed.
+
+A founded site is recorded like any other, with `big = 1`. It takes its grid
+cell's key when the cell is free, so the grid never builds a hamlet beside
+it; in a cell that already has a site it is recorded as `founded:x:z`. Sky
+Folk arrive around its middle as usual, and a big village also gets a group
+for every six houses out on its ring.
+
+Portals only count `big` villages as destinations, so the grid's own
+hamlets stay quiet places to find by flying.
+
 ## Settings
 
 | Setting | Default | Meaning |

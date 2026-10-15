@@ -1,7 +1,7 @@
 # 🌀 Sky Portals
 
-*Mese-framed portals, lit with an iron ingot, that carry you up to the sky
-islands and back.* `portal/sky_portal.lua`
+*Mese-framed portals, lit with an iron ingot, that carry you up to a sky
+village and back.* `portal/sky_portal.lua`
 
 They replace the obsidian door trials, which asked players to restore a
 ruined shrine block-for-block before a boss arena opened. That was a lot of
@@ -53,44 +53,81 @@ generated; the player gets a message saying the portal is reaching up (or
 down). Anyone who walks off before it is ready stays where they are — the far
 portal is still built and linked, so their next trip is instant.
 
-## 4. Where it goes — and the lack of dimensions
+## 4. Where it goes: a sky village
 
-Luanti has no separate dimensions. The sky islands are Asuna's floatlands —
-the same world, scattered through **y = 287 to 28,000**. So a portal leads
-**straight up or straight down from where it stands**:
+Luanti has no separate dimensions. The sky islands are Asuna's floatlands,
+part of the same world and scattered through **y = 287 to 28,000**. A
+portal's direction is set by its height:
 
 | Portal is... | It leads... |
 |---|---|
-| below `lualore_portal_sky_y` (290) | up, to the sky islands overhead |
+| below `lualore_portal_sky_y` (290) | up, to a **sky village** |
 | at or above it | down, to the ground below |
 
-**Going up**, the first trip:
+### Going up
 
-1. If a recorded **sky site** (a hamlet or castle from
-   `valkyrie/floating_buildings.lua`) lies within 160 nodes, it aims for that
-   island. A site with no room for a frame falls back to step 2 rather than
-   clearing a platform among its houses.
-2. Otherwise it searches a 48×48 column from y 290 to 610 for island
-   surface with room for a 4×5 frame and somewhere to step out on both sides,
-   preferring the spot closest to straight overhead at about y 350 — which
-   favours the lowest islands.
-3. If no island has room, it builds a **small obsidian platform** at y 350
-   and puts the portal on that, so a trip never fails for lack of land.
+A ground portal leads to a **portal village**: a town of 18 sky houses by
+default, against the 2–6 of a hamlet the sky-site grid builds on its own.
 
-**Going down** searches a 48×48 column for the highest open ground below the
-floatlands. Columns of water or under trees are passed over; over open sea it
-builds the platform on the water.
+1. **A portal village within reach.** If a portal-founded village lies
+   within 800 nodes (`lualore_portal_village_reach`), the portal goes there.
+   The grid's own small hamlets don't count, because a portal should lead
+   to a town.
+2. **Otherwise it founds one** directly overhead. The player is told *"Far
+   above, an island gathers itself out of the clouds..."* while it happens:
+   - It picks a height in the sky-site band, trying 560, 640, 720, 800 and
+     880 in turn until it finds open sky. The floatlands are scattered
+     through every height, so one may already fill the first choice.
+   - It raises a **crystal island** there the way Everness builds its
+     crystal forest: crystal grass over crystal dirt over crystal stone.
+     The outline is lobed (from the village ground module), and the
+     underside tapers from up to 28 nodes deep in the middle to a thin rim. The island
+     is sized to the town: a mean radius of 66 nodes for 18 houses.
+     Only air is filled; nothing already there is carved away.
+   - It has the sky-site builder (`valkyrie/floating_buildings.lua`) put the
+     town on it: houses on a lobed ring with paths and planting, and the
+     **skycastle** on its usual 15% roll. The castle holds the valkyrie
+     chest and is meant to stay rare.
+   - The village is recorded like any grid-built site, flagged `big`. If its
+     grid cell is still free it takes that cell, so the grid never builds a
+     hamlet beside it.
+   - **Sky Folk** arrive around the middle as usual, plus a group for every
+     six houses out on the ring (three more groups for 18 houses), so the
+     edges aren't empty.
+3. **The portal is built in the village**, on open ground as near the middle
+   as possible. Height counts heavily in that search: a flat house roof in
+   the middle loses to the ground a few houses out.
 
-**Either way**, the far portal is built sunk into the ground so you can walk
-straight out, and the two portals are **linked**. Later trips go straight to
-the linked portal. A portal lit within 24 nodes of an existing far end
-**reuses** it instead of building a second one beside it — the classic
-behaviour, so two ground portals close together can share one sky portal (it
-then leads back to whichever of them used it last).
+**Every ground portal gets its own portal in the village.** Two bases never
+share a way home: each village portal leads back to the ground portal that
+made it.
+
+If the village has no open ground left near its middle, or no village can
+be founded (sky buildings switched off with `lualore_sky_buildings`, or no
+open sky at any of the five heights), the portal falls back to the bare sky
+overhead. It searches a 48×48 column from y 290 to 610 for any island with
+room. If none has room, it builds a **small obsidian platform** at y 350, so
+a trip never fails for lack of land.
+
+### Going down
+
+A portal built in the sky searches a 48×48 column for the highest open
+ground below the floatlands. Columns of water or under trees are passed
+over; over open sea it builds the platform on the water.
+
+If a ground portal already stands within 24 nodes, it is **reused** as the
+far end. That ground portal keeps its own link back to its village portal,
+so a portal you build in the sky never takes over someone's way home.
+
+### Either way
+
+The far portal is built sunk into the ground so you can walk straight out,
+and the two portals are **linked**. Later trips go straight to the linked
+portal.
 
 If the far portal has been broken, the next trip notices, forgets it and
-searches afresh. Landing spots inside a protected area are passed over,
-and a trip that could only end in one fails with a message instead.
+searches afresh. Landing spots inside a protected area are passed over, and
+a trip that could only end in one fails with a message instead.
 
 The trip is a shortcut, not a way out of the world: the floatlands are open
 sky, and falling off an island means falling a long way.
@@ -148,6 +185,8 @@ and buffer bounds, and emits a single 4-second `idle` animation.
 | `lualore_sky_portals` | true | Portals light and carry players. When off, existing portals stay visible but inert. |
 | `lualore_portal_delay` | 2.0 | Seconds in the sheet before travelling. |
 | `lualore_portal_sky_y` | 290 | Where the sky begins: portals above lead down, below lead up. |
+| `lualore_portal_village_reach` | 800 | Go to a portal village this close instead of founding one. |
+| `lualore_portal_village_houses` | 18 | Houses in a village a portal founds (6–30). The island grows to fit. |
 | `lualore_portal_max_size` | 256 | Largest interior side the frame scan follows. |
 | `lualore_mirror_sentinels` | true | Sentinels spawn on the sky islands. |
 
@@ -186,10 +225,20 @@ the file once no world in use still has players parked on a mirror island.
   frames of 16×16, a vortex twisted about each tile's centre over a scrolling
   wave pattern. Every term is periodic in both the tile and the loop, so the
   sheet tiles with no seams and the animation loops with no jump.
-- **Testing.** The frame scan, ignition, collapse, both directions of travel,
-  reuse, a destroyed far end, the platform fallbacks, the walk-away case and
-  the storage round trip were exercised offline under LuaJIT against a
-  stubbed world (47 checks). Two mutations — a 2-tall minimum and a missing
-  step-out guard — were each caught, the second only after the test was made
-  to watch every tick rather than the end position, since a bounce down and
-  back up again ends where it started.
+- **Testing.** Everything was exercised offline under LuaJIT against a
+  stubbed world (70 checks): the frame scan, ignition, collapse, both
+  directions of travel, a destroyed far end, the platform fallbacks, the
+  walk-away case, storage, and the villages. The village checks cover:
+  founding a town and raising its island, a second ground portal getting
+  its own village portal (and the right way home), reusing a ground portal
+  without stealing its link, moving up when a floatland blocks the first
+  height, ignoring small hamlets, using an existing town 700 nodes away,
+  and falling back when sky buildings are off. The sky-site builder was
+  stubbed. Five mutations were each caught, the last only after the test
+  was made to watch every tick:
+  - a 2-tall minimum frame
+  - counting small hamlets as villages
+  - letting reuse overwrite a back-link
+  - weighing height lightly in a village (the portal then landed on a house
+    roof at y 568.5)
+  - a missing step-out guard

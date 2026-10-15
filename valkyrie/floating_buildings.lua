@@ -605,10 +605,14 @@ local function build_site(cx, cz, seed, scan_top, scan_bottom, opts)
 
 	local pr = PcgRandom(seed)
 	local target = pr:next(HOUSES_MIN, HOUSES_MAX)
+	if opts.houses then
+		target = opts.houses -- a founded village asks for its size
+	end
 	local want_castle = opts.force_castle
 		or (not opts.no_castle and pr:next(0, 9999) < CASTLE_CHANCE * 10000)
 
-	local cluster_r = math.min(RADIUS + math.max(0, target - 3) * 2, 46)
+	local cluster_r = math.min(RADIUS + math.max(0, target - 3) * 2,
+		opts.max_radius or 46)
 	if want_castle then
 		cluster_r = cluster_r + 6 -- room for the castle in the middle
 	end
@@ -680,7 +684,7 @@ local function build_site(cx, cz, seed, scan_top, scan_bottom, opts)
 	for i = 1, target do
 		local slot = base_angle + (i - 1) * (math.pi * 2 / target)
 			+ (pr:next(-50, 50) / 100)
-		for _ = 1, 8 do
+		for _ = 1, opts.tries or 8 do
 			local cosa, sina = math.cos(slot), math.sin(slot)
 			local r_out = cluster_r
 			if shape then
@@ -762,13 +766,16 @@ end
 
 local records = load_records()
 
-local function record_site(cell_key, x, y, z, houses, castle, chest)
+local function record_site(cell_key, x, y, z, houses, castle, chest, extra)
 	records[cell_key] = {
 		x = x, y = y, z = z,
 		houses = houses,
 		castle = castle and 1 or 0,
 		chest = chest,
 	}
+	for k, v in pairs(extra or {}) do
+		records[cell_key][k] = v
+	end
 	storage:set_string("sky_sites", minetest.serialize(records))
 end
 
@@ -863,6 +870,59 @@ lualore.floating_buildings = {
 	records = function()
 		return records
 	end,
+	-- Build a site at (x, z) and register it like a grid-built one, Sky Folk
+	-- and all. Sky portals use this to found a village where none exists.
+	-- It is recorded under the grid cell it stands in when that cell is
+	-- still free, so the grid never builds a second site beside it; a cell
+	-- that already has a site keeps it, and this one gets a key of its own.
+	-- opts: top/bottom (the island top's height window), seed, and for a
+	-- bigger village houses, max_radius and tries (see build_site); big =
+	-- true marks the record and spreads more Sky Folk around the ring.
+	-- Returns true, record, key; or whatever build_site returned
+	-- (false / "retry").
+	found_at = function(x, z, opts)
+		opts = opts or {}
+		local cell_key = math.floor(x / SPACING) .. ":" .. math.floor(z / SPACING)
+		local key = cell_key
+		if records[cell_key] then
+			key = "founded:" .. x .. ":" .. z
+			if records[key] then
+				return false, "taken"
+			end
+		end
+		local seed = opts.seed or
+			(get_world_salt() + x * 73856093 + z * 19349663) % 2147483647
+		local result, houses, castle, floor_y, chest, planted =
+			build_site(x, z, seed, opts.top, opts.bottom, opts)
+		if result ~= true then
+			return result
+		end
+		record_site(key, x, floor_y, z, houses, castle, chest,
+			opts.big and {big = 1} or nil)
+		spawn_founders({x = x, y = floor_y, z = z}, key)
+		-- Founders arrive around the middle; a big village also gets a group
+		-- for every six houses out on its ring, or its edges stand empty.
+		local groups = opts.big and math.floor(houses / 6) or 0
+		local ring = math.floor((opts.max_radius or 46) * 0.55)
+		for i = 1, groups do
+			local a = (i - 1) * 2 * math.pi / groups
+			spawn_founders({
+				x = x + math.floor(math.cos(a) * ring + 0.5),
+				y = floor_y,
+				z = z + math.floor(math.sin(a) * ring + 0.5),
+			}, key .. ":" .. i)
+		end
+		minetest.log("action", string.format(
+			"[lualore] Sky site founded at %d,%d,%d - %d houses, %s, %d plants",
+			x, floor_y, z, houses, castle and "CASTLE" or "no castle",
+			planted or 0))
+		return true, records[key], key
+	end,
+	enabled = ENABLED,
+	spacing = SPACING,
+	y_min = Y_MIN,
+	y_max = Y_MAX,
+	surface = SKY_PALETTE.ground.base,
 }
 
 -- ------------------------------------------------------------------

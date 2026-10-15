@@ -14,18 +14,27 @@
 
 	Luanti has no dimensions, so "the sky islands" are the floatlands of this
 	same world, which Asuna generates between y = 287 and y = 28000. A portal
-	therefore leads straight up (or down) from where it stands:
+	built on the ground leads up to a SKY VILLAGE - a hamlet of sky houses
+	with its Sky Folk, sometimes a castle:
 
-	  * The first trip through a portal searches the sky above it for an
-	    island with room for a frame, preferring the lowest islands and any
-	    recorded sky site close by. If no island is found it builds a small
-	    obsidian platform instead, so a trip never fails for lack of land.
-	  * A matching portal is built on arrival and the two are linked. Later
-	    trips go straight to the linked portal.
-	  * Going down works the same way, searching for open ground below.
-	  * Another portal already standing near the arrival point is reused
-	    rather than building a second one beside it.
+	  * If a sky village already stands within reach (600 nodes by default,
+	    never less than one sky-site grid cell), the portal goes there.
+	  * If none does, it founds one: it raises a crystal island overhead and
+	    has the sky-site builder (valkyrie/floating_buildings.lua) put a
+	    village on it. The village is recorded under its grid cell like any
+	    other, so the grid never builds a second one beside it.
+	  * The far portal is built in the village, as near the middle as there
+	    is open ground, and the two portals are linked. Later trips go
+	    straight to the linked portal.
+	  * Every ground portal gets its own portal in the village, so two bases
+	    never share a way home.
+	  * A portal built in the sky leads down to open ground below; if a
+	    ground portal already stands close by it is reused (without taking
+	    over that portal's own way back).
 	  * If the far portal has been broken, the next trip searches afresh.
+	  * With sky buildings switched off, or if no village can be founded, a
+	    portal falls back to the nearest island overhead with room, and
+	    failing that a small obsidian platform, so a trip never fails.
 
 	Breaking any frame block puts the sheet out. Relight it with another
 	ingot; a portal relit in the same place keeps its link.
@@ -61,16 +70,39 @@ local SKY_Y = math.floor(setting_number("lualore_portal_sky_y", 290))
 -- Seconds a player has to stand in the sheet before it carries them.
 local TRAVEL_DELAY = setting_number("lualore_portal_delay", 2.0)
 
+-- Go to an existing portal village this close rather than founding a new
+-- one.
+local VILLAGE_REACH = math.floor(setting_number("lualore_portal_village_reach", 800))
+
+-- A portal village is a town, not a hamlet: the sky-site grid builds 2-6
+-- houses, a portal village this many. Its cluster radius follows the
+-- grid's own rule (30, plus 2 per house beyond three) and its island is a
+-- little wider than that.
+local VILLAGE_HOUSES = math.max(6, math.min(30, math.floor(
+	setting_number("lualore_portal_village_houses", 18))))
+local VILLAGE_RADIUS = math.min(70, 30 + (VILLAGE_HOUSES - 3) * 2)
+
 local TICK = 0.25          -- watcher interval (ingots and travellers)
 local IGNITE_RADIUS = 12   -- how far from a player a dropped ingot is noticed
-local REUSE_RADIUS = 24    -- reuse an existing far portal within this
+local REUSE_RADIUS = 24    -- going down, reuse a ground portal within this
 local SEARCH_RADIUS = 24   -- half-width of the box searched for a landing
-local SKY_SEARCH = 320     -- how far above SKY_Y to look for an island
-local SKY_AIM = SKY_Y + 60 -- the height a sky search prefers
-local SITE_PULL = 160      -- head for a recorded sky site this close instead
-local SITE_BAND = 48       -- vertical half-height searched around a sky site
+local VILLAGE_SEARCH = 32  -- ...and around a village, which is wider
+local SKY_SEARCH = 320     -- how far above SKY_Y to look for a bare island
+local SKY_AIM = SKY_Y + 60 -- the height a bare-island search prefers
+local SITE_BAND = 48       -- vertical half-height searched around a village
 local GROUND_FLOOR = -48   -- bottom of the box searched for ground
 local PLATFORM = "default:obsidian"
+
+-- A founded village's island: wide enough for the whole cluster with a
+-- rim to walk round, and deep enough to look like it has weight. The
+-- castle is left to its usual roll - it holds the valkyrie chest and is
+-- meant to stay rare.
+local ISLAND_R = VILLAGE_RADIUS + 6
+local ISLAND_DEPTH = 26    -- deepest point of its underside
+local ISLAND_HEADROOM = 28 -- open air wanted above it for the houses
+-- Heights tried for a founded village, above the sky-site band's floor, in
+-- order, until one has open sky; the floatlands overhead may be in the way.
+local VILLAGE_HEIGHTS = {60, 140, 220, 300, 380}
 
 -- ------------------------------------------------------------------
 -- The portal node
@@ -344,9 +376,15 @@ local function remember(frame)
 	return key, rec
 end
 
-local function link(key_a, key_b)
-	records[key_a].link = key_b
-	records[key_b].link = key_a
+-- `from` now leads to `to`. `to` leads back to `from` unless it already
+-- leads somewhere that still exists: a ground portal reused by a sky portal
+-- keeps its own way home rather than having it taken over.
+local function link(from, to)
+	records[from].link = to
+	local back = records[to].link
+	if not (back and records[back]) then
+		records[to].link = from
+	end
 	save_records()
 end
 
@@ -511,11 +549,13 @@ local function fits(get, x, ground_y, z, axis)
 	return true
 end
 
-local function search_box(target, going_up, site)
-	local r = SEARCH_RADIUS + 3
+-- The box to search for a landing: around a village's floor, the bare sky
+-- overhead, or the ground below the floatlands.
+local function search_box(target, going_up, village)
+	local r = (village and VILLAGE_SEARCH or SEARCH_RADIUS) + 3
 	local minp = {x = target.x - r, z = target.z - r}
 	local maxp = {x = target.x + r, z = target.z + r}
-	if going_up and site then
+	if village then
 		minp.y, maxp.y = target.y - SITE_BAND, target.y + SITE_BAND
 	elseif going_up then
 		minp.y, maxp.y = SKY_Y, SKY_Y + SKY_SEARCH
@@ -526,11 +566,13 @@ local function search_box(target, going_up, site)
 end
 
 -- Search a loaded box for the best place to build a portal. Going up, the
--- best is the closest to `target` in three dimensions, which favours the
--- low islands straight overhead. Going down only the horizontal distance
--- counts, and only the highest ground in each column is a candidate, so a
--- cave floor never beats the surface above it.
-local function find_spot(minp, maxp, target, going_up, protected_by)
+-- best is the closest to `target` in three dimensions: in a village that is
+-- open ground near its middle, and height counts heavily so that a flat
+-- house roof in the middle loses to the ground a few houses out; over bare
+-- sky it favours the low islands straight overhead. Going down only the
+-- horizontal distance counts, and only the highest ground in each column is
+-- a candidate, so a cave floor never beats the surface above it.
+local function find_spot(minp, maxp, target, going_up, protected_by, village)
 	local vm = minetest.get_voxel_manip()
 	local emin, emax = vm:read_from_map(minp, maxp)
 	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
@@ -545,16 +587,17 @@ local function find_spot(minp, maxp, target, going_up, protected_by)
 	end
 
 	local best, best_score
-	local lo, hi = SEARCH_RADIUS, SEARCH_RADIUS
-	for oz = -lo, hi, 2 do
-		for ox = -lo, hi, 2 do
+	local reach = village and VILLAGE_SEARCH or SEARCH_RADIUS
+	local weight = village and 2.0 or 0.5
+	for oz = -reach, reach, 2 do
+		for ox = -reach, reach, 2 do
 			local x, z = target.x + ox, target.z + oz
 			local y = maxp.y - NEW_H - 2
 			while y > minp.y do
 				if get(x, y, z) == "solid" and get(x, y + 1, z) == "clear" then
 					for _, axis in ipairs({"x", "z"}) do
 						if fits(get, x, y, z, axis) then
-							local dy = going_up and (y - target.y) * 0.5 or 0
+							local dy = going_up and (y - target.y) * weight or 0
 							local score = ox * ox + oz * oz + dy * dy
 							if not best_score or score < best_score then
 								local anchor = {x = x, y = y + 1, z = z}
@@ -623,29 +666,8 @@ local function build(frame)
 	light(frame)
 end
 
-local function recorded_sky_site(near)
-	local fb = lualore.floating_buildings
-	if not (fb and fb.records) then
-		return nil
-	end
-	local ok, sites = pcall(fb.records)
-	if not ok or type(sites) ~= "table" then
-		return nil
-	end
-	local best, best_d
-	for _, site in pairs(sites) do
-		if type(site) == "table" and site.x and site.y and site.z then
-			local d = math.hypot(site.x - near.x, site.z - near.z)
-			if d <= SITE_PULL and (not best_d or d < best_d) then
-				best, best_d = site, d
-			end
-		end
-	end
-	return best
-end
-
 -- ------------------------------------------------------------------
--- Travel
+-- Travel plumbing
 -- ------------------------------------------------------------------
 local travellers = {} -- player name -> {timer, must_leave, busy}
 
@@ -677,13 +699,176 @@ local function around(frame, pad)
 end
 
 -- Search the box around `target` for a landing spot, loading it first.
-local function search(target, going_up, site, protected_by, fn)
-	local minp, maxp = search_box(target, going_up, site)
+local function search(target, going_up, village, protected_by, fn)
+	local minp, maxp = search_box(target, going_up, village)
 	emerge_then(minp, maxp, function()
-		fn(find_spot(minp, maxp, target, going_up, protected_by), minp, maxp)
+		fn(find_spot(minp, maxp, target, going_up, protected_by, village),
+			minp, maxp)
 	end)
 end
 
+-- ------------------------------------------------------------------
+-- Sky villages
+-- ------------------------------------------------------------------
+-- The sky-site builder, if sky buildings are switched on.
+local function sky_builder()
+	local fb = lualore.floating_buildings
+	if fb and fb.enabled and fb.found_at and fb.records then
+		return fb
+	end
+	return nil
+end
+
+-- The nearest portal village. Only villages a portal founded count: the
+-- grid's own hamlets are small, and a portal should lead to a town.
+local function nearest_village(fb, near)
+	local reach = VILLAGE_REACH
+	local ok, sites = pcall(fb.records)
+	if not ok or type(sites) ~= "table" then
+		return nil
+	end
+	local best, best_d
+	for _, site in pairs(sites) do
+		if type(site) == "table" and site.big == 1
+				and site.x and site.y and site.z then
+			local d = math.hypot(site.x - near.x, site.z - near.z)
+			if d <= reach and (not best_d or d < best_d) then
+				best, best_d = site, d
+			end
+		end
+	end
+	return best
+end
+
+local function island_box(cx, y, cz)
+	local r = ISLAND_R + 6 -- the outline bulges past its mean radius
+	return {x = cx - r, y = y - ISLAND_DEPTH - 3, z = cz - r},
+		{x = cx + r, y = y + ISLAND_HEADROOM, z = cz + r}
+end
+
+-- Is there open sky for an island and its houses here? The floatlands are
+-- scattered through every height, so one may already fill the spot.
+local function island_clear(minp, maxp)
+	local vm = minetest.get_voxel_manip()
+	local emin, emax = vm:read_from_map(minp, maxp)
+	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
+	local data = vm:get_data()
+	local c_air = minetest.get_content_id("air")
+	local taken, total = 0, 0
+	for z = minp.z, maxp.z do
+		for y = minp.y, maxp.y do
+			for x = minp.x, maxp.x do
+				total = total + 1
+				if data[area:index(x, y, z)] ~= c_air then
+					taken = taken + 1
+				end
+			end
+		end
+	end
+	return taken <= total * 0.02
+end
+
+-- Raise a crystal island with its top at `y`, made the way Everness makes
+-- its crystal forest: crystal grass over crystal dirt over crystal stone.
+-- The outline comes from the village ground module, so it is lobed rather
+-- than round, and the underside tapers to a rough point. Only air is
+-- filled; anything already there stays.
+local function raise_island(cx, y, cz, seed)
+	local ground = lualore.village_ground
+	local shape = ground and ground.new_shape
+		and ground.new_shape(seed, ISLAND_R, ISLAND_R * 0.8, 0)
+	local minp, maxp = island_box(cx, y, cz)
+	local vm = minetest.get_voxel_manip()
+	local emin, emax = vm:read_from_map(minp, maxp)
+	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
+	local data = vm:get_data()
+	local c_air = minetest.get_content_id("air")
+	local c_top = minetest.get_content_id("everness:dirt_with_crystal_grass")
+	local c_dirt = minetest.get_content_id("everness:crystal_dirt")
+	local c_stone = minetest.get_content_id("everness:crystal_stone")
+	local roughness = minetest.get_perlin({offset = 0, scale = 1,
+		spread = {x = 9, y = 9, z = 9}, seed = seed % 65536,
+		octaves = 2, persist = 0.5})
+	local reach = maxp.x - cx
+	for z = cz - reach, cz + reach do
+		for x = cx - reach, cx + reach do
+			local dx, dz = x - cx, z - cz
+			local d = math.sqrt(dx * dx + dz * dz)
+			local r = ISLAND_R
+			if shape and d > 0 then
+				r = (shape:profile(dx, dz))
+			end
+			if d <= r then
+				local edge = 1 - d / r
+				local n = roughness:get_2d({x = x, y = z})
+				local depth = 2 + math.floor(ISLAND_DEPTH * edge ^ 0.75
+					* (0.8 + 0.25 * n) + 0.5)
+				depth = math.min(depth, ISLAND_DEPTH + 2)
+				for yy = y - depth, y do
+					local i = area:index(x, yy, z)
+					if data[i] == c_air then
+						if yy == y then
+							data[i] = c_top
+						elseif yy >= y - 2 then
+							data[i] = c_dirt
+						else
+							data[i] = c_stone
+						end
+					end
+				end
+			end
+		end
+	end
+	vm:set_data(data)
+	vm:write_to_map(true)
+end
+
+-- Found a village above `column`: try each height in turn until one has
+-- open sky, raise an island there and have the sky-site builder put a
+-- village on it. Calls done(site) or done(nil).
+local function found_village(fb, column, protected_by, done)
+	local base = fb.y_min or 500
+	local seed = (column.x * 73856093 + column.z * 19349663) % 2147483647
+	local i = 0
+	local function try_next()
+		i = i + 1
+		local height = VILLAGE_HEIGHTS[i]
+		if not height then
+			return done(nil)
+		end
+		local y = base + height
+		if minetest.is_protected({x = column.x, y = y, z = column.z},
+				protected_by) then
+			return try_next()
+		end
+		local minp, maxp = island_box(column.x, y, column.z)
+		emerge_then(minp, maxp, function()
+			if not island_clear(minp, maxp) then
+				return try_next()
+			end
+			raise_island(column.x, y, column.z, seed)
+			local ok, site = fb.found_at(column.x, column.z, {
+				top = y + 1, bottom = y - 1, seed = seed,
+				big = true,
+				houses = VILLAGE_HOUSES,
+				max_radius = VILLAGE_RADIUS,
+				tries = 16, -- a crowded ring needs more goes per house
+			})
+			if ok == true and type(site) == "table" then
+				return done(site)
+			end
+			minetest.log("warning", "[lualore] Sky portal raised an island at " ..
+				minetest.pos_to_string({x = column.x, y = y, z = column.z}) ..
+				" but no village could be built on it")
+			return done(nil)
+		end)
+	end
+	try_next()
+end
+
+-- ------------------------------------------------------------------
+-- Resolving a destination
+-- ------------------------------------------------------------------
 -- Every failed check below forgets a record before retrying, so this
 -- cannot loop; the limit only stops a world full of stale records from
 -- making one trip take forever.
@@ -691,7 +876,8 @@ local MAX_RETRIES = 8
 
 -- Work out where the portal `key` leads, building the far end if need be,
 -- then call done(dest_key) - or done(nil) if there is nowhere to go.
-local function resolve(key, protected_by, done, depth)
+-- `ctx` is {name = player name (for protection), say = function(msg)}.
+local function resolve(key, ctx, done, depth)
 	depth = depth or 0
 	local rec = records[key]
 	if not rec or depth > MAX_RETRIES then
@@ -714,7 +900,7 @@ local function resolve(key, protected_by, done, depth)
 			end
 			-- the far end is gone; forget it and look again
 			forget(dest_key)
-			return resolve(key, protected_by, done, depth + 1)
+			return resolve(key, ctx, done, depth + 1)
 		end)
 	end
 
@@ -722,46 +908,69 @@ local function resolve(key, protected_by, done, depth)
 	local here = centre_of(frame_of(rec))
 	local column = {x = math.floor(here.x + 0.5), z = math.floor(here.z + 0.5),
 		y = going_up and SKY_AIM or 0}
-	local site = going_up and recorded_sky_site(column)
-	local target = site and {x = site.x, y = site.y, z = site.z} or column
 
-	-- someone already built a portal at the other end, close by
-	local near_key = nearest_record(target, going_up, REUSE_RADIUS, key)
-	if near_key then
-		link(key, near_key)
-		return resolve(key, protected_by, done, depth + 1)
-	end
-
-	local function settle(frame)
+	local function settle(frame, village)
 		build(frame)
-		local dest_key = remember(frame)
+		local dest_key, dest = remember(frame)
+		dest.village = village or nil
 		link(key, dest_key)
 		minetest.log("action", "[lualore] Sky portal " .. key ..
-			" linked to new portal " .. dest_key)
+			" linked to new portal " .. dest_key ..
+			(village and " in a sky village" or ""))
 		return done(dest_key)
 	end
 
+	-- The bare sky overhead (or the ground below), and failing that a
+	-- platform: what a portal does when there is no village to go to.
 	local function fall_back_to_column()
-		search(column, going_up, nil, protected_by, function(frame, minp, maxp)
+		search(column, going_up, false, ctx.name, function(frame, minp, maxp)
 			if frame then
 				return settle(frame)
 			end
-			-- no island or ground with room anywhere near: make some
-			if minetest.is_protected(column, protected_by) then
+			if minetest.is_protected(column, ctx.name) then
 				return done(nil)
 			end
 			return settle(platform_at(column, going_up, minp, maxp))
 		end)
 	end
 
-	if not site then
+	-- Open ground as near the village's middle as possible. A village whose
+	-- ground is all taken sends the portal to the column search instead of
+	-- clearing a platform among its houses.
+	local function land_in_village(site)
+		search({x = site.x, y = site.y, z = site.z}, true, true, ctx.name,
+			function(frame)
+				if frame then
+					return settle(frame, true)
+				end
+				return fall_back_to_column()
+			end)
+	end
+
+	if not going_up then
+		-- a ground portal already standing close by serves as the far end
+		local near_key = nearest_record(column, false, REUSE_RADIUS, key)
+		if near_key then
+			link(key, near_key)
+			return resolve(key, ctx, done, depth + 1)
+		end
 		return fall_back_to_column()
 	end
-	-- Try the sky site first. If its island has no room, go back to the
-	-- plain column search rather than clearing a platform among its houses.
-	search(target, going_up, site, protected_by, function(frame)
-		if frame then
-			return settle(frame)
+
+	local fb = sky_builder()
+	if not fb then
+		return fall_back_to_column()
+	end
+	local site = nearest_village(fb, column)
+	if site then
+		return land_in_village(site)
+	end
+	if ctx.say then
+		ctx.say(S("Far above, an island gathers itself out of the clouds..."))
+	end
+	found_village(fb, column, ctx.name, function(new_site)
+		if new_site then
+			return land_in_village(new_site)
 		end
 		return fall_back_to_column()
 	end)
@@ -780,7 +989,10 @@ local function arrive(player, dest_key)
 	swirl(frame, 30)
 	minetest.sound_play("magic",
 		{pos = centre_of(frame), gain = 0.8, max_hear_distance = 20}, true)
-	if dest.sky then
+	if dest.village then
+		minetest.chat_send_player(player:get_player_name(),
+			S("You step out into a sky village. Mind the edge."))
+	elseif dest.sky then
 		minetest.chat_send_player(player:get_player_name(),
 			S("You step out among the sky islands. Mind the edge."))
 	end
@@ -812,7 +1024,13 @@ local function depart(player, portal_pos)
 			and S("The portal reaches down toward the ground...")
 			or S("The portal reaches up toward the sky islands..."))
 	end
-	resolve(key, name, function(dest_key)
+	local ctx = {
+		name = name,
+		say = function(msg)
+			minetest.chat_send_player(name, msg)
+		end,
+	}
+	resolve(key, ctx, function(dest_key)
 		t.busy = false
 		t.must_leave = true
 		local who = minetest.get_player_by_name(name)
