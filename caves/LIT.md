@@ -55,16 +55,70 @@ animation per clip, so the three clips are concatenated into a single
 timeline by `tools/combine_gltf_animations.py`:
 
 ```
-0.00 -  5.50  idle   (original "animation.standing.golbo")
-5.50 - 11.25  walk   (original "animation.walking.golbo")
-11.25 - 16.75  drill  (original "animation.mining.golbo")
+ 0.00 -  5.92  idle   (original "animation.standing.golbo")
+ 6.17 - 12.17  walk   (original "animation.walking.golbo")
+12.42 - 13.63  drill  (original "animation.mining.golbo")
 ```
+
+Take these numbers from what the tool prints. It does not simply append the
+clips, because doing that produced three faults that together were most of
+why the Lit looked mechanical:
+
+1. **One channel per bone.** glTF lets a bone be driven by at most one
+   channel per animation. Appending the clips gave `chest`, `torso` and
+   `leftUpperArm` three channels each and two more bones two, which is
+   invalid — the renderer picked a winner. Worse, a glTF sampler *clamps*
+   outside its own key range, so the legs (keyed only in the walk) held a
+   mid-stride pose through the whole idle and drill. Bones a clip does not
+   animate now hold their **rest** pose for that clip, which is what the clip
+   looks like in Blockbench.
+2. **A guard gap between clips** (`--gap`, default 0.25). Without it the
+   last frame of one clip is the first frame of the next, and whichever pose
+   lost showed for a frame every time its clip looped.
+3. **Closed loops and baked easing** (`--no-close-loops`, `--smooth N`). The
+   walk was six one-second strides cut off three-quarters of the way through
+   the sixth, so looping it jumped a quarter-stride — a lurch once per
+   cycle. Each clip now ends on the pose it began with. Easing is resampled
+   into denser `LINEAR` keys rather than written as `CUBICSPLINE`, because
+   Luanti reads `LINEAR` samplers.
+
+Verified after regenerating: 12 channels for 12 bones, no duplicate targets,
+every clip's loop seam under 0.1°, and leg travel through the idle exactly 0°.
 
 The mob plays these ranges with speed 1.0:
 
 - idle / walk via the standard `animation` table (`stand_*`, `walk_*`, with
   `speed_normal = 1` — correct for glTF),
 - the drill clip directly during burrowing.
+
+### Editing the model in Blockbench
+
+The Blockbench source is `art/lit.bbmodel` (the original also sits in the
+author's Downloads). Open that, not `models/lit.gltf` — Blockbench's glTF
+codec is **export-only** (`parse: false`), so it cannot reopen its own export.
+
+The rig uses **native armature bones**, not groups, so the MCP
+`manage_keyframes` tool cannot target it; bone animators have to be driven
+through the Blockbench API. Keyframe values are offsets **added to** a bone's
+rest rotation, which is why `leftUpperArm` carries `z=90` in every clip: its
+rest is `z=-90`, and the key cancels it. `torso`, `chest` and `head` are a
+parented chain, so their angles accumulate — a 13/7/8 fold reads as the model
+toppling over, not hunching.
+
+Export settings that reproduce the shipped file:
+
+| Option | Value | Why |
+|---|---|---|
+| `scale` | **1.6** | Output size is `32 / scale`. Blockbench's default of 16 exports Lit 2 units tall instead of 20, and Luanti would render it a tenth of its size. |
+| `armature` | true | Keeps the skinned rig. |
+| `merge_armature` | true | One `SkinnedMesh` rather than seven. |
+| `animations` | true | |
+| `encoding` | ascii | |
+
+After exporting, confirm geometry is unchanged before committing: vertex
+extent should be `[18.75, 20, 5.0]`, and bone origins and rest rotations
+should match the previous `lit.gltf` exactly. Only the animation channel
+counts should differ.
 
 **If you re-export `lit.gltf`, regenerate the combined model:**
 

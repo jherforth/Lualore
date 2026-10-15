@@ -22,9 +22,24 @@
 	animation per glTF model and uses glTF timestamps (seconds) as frame
 	numbers, so the original three clips are concatenated into a single
 	timeline and played through frame ranges (speed 1.0):
-	    0.00 -  5.50  idle   (original "animation.standing.golbo")
-	    5.50 - 11.25  walk   (original "animation.walking.golbo")
-	   11.25 - 16.75  drill  (original "animation.mining.golbo")
+	    0.00 -  5.92  idle   (original "animation.standing.golbo")
+	    6.17 - 12.17  walk   (original "animation.walking.golbo")
+	   12.42 - 13.63  drill  (original "animation.mining.golbo")
+	The combiner does three things the raw export does not, so take the
+	ranges above from what it prints rather than setting them by hand:
+	  * One channel per bone. glTF allows a bone to be driven once per
+	    animation; concatenating the clips naively gave some bones three
+	    channels, which is invalid and left the winning pose up to the
+	    renderer. It also meant a bone animated in only one clip held that
+	    clip's pose during the others, because samplers clamp outside their
+	    own key range - the legs stood in mid-stride through the whole idle.
+	    Bones a clip does not touch now hold their rest pose instead.
+	  * A guard gap between clips, so no frame belongs to two of them and
+	    looping one cannot flash the next one's opening pose.
+	  * Closed loops and baked easing. The walk was six one-second strides
+	    cut off three-quarters through the sixth, so every loop lurched; it
+	    now ends on the pose it starts from. Easing is resampled into denser
+	    LINEAR keys because Luanti reads LINEAR samplers only.
 	If lit.gltf is ever re-exported, regenerate the combined model with:
 	    python tools/combine_gltf_animations.py models/lit.gltf ^
 	        models/lit_combined.gltf animation.standing.golbo ^
@@ -45,9 +60,9 @@ local BOLT = "lualore:lit_fire_bolt"
 
 -- Animation ranges (seconds == frames) and sizes
 local ANIM = {
-	idle = {0.0, 5.5},
-	walk = {5.5, 11.25},
-	mine = {11.25, 16.75},
+	idle = {0.0, 5.917},
+	walk = {6.167, 12.167},
+	mine = {12.417, 13.625},
 }
 -- Entities render meshes at 10 units per node, so the 20-unit model is
 -- 2.0 nodes tall at scale 1; 1.25 renders it at ~2.5 nodes tall

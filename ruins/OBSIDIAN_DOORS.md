@@ -140,6 +140,20 @@ so nobody can get stuck on the island.
 | `/find_obsidian_door [radius]`| -      | Nearest recorded shrine + awakened state       |
 | `/clear_obsidian_door_records`| server | Forget records (built shrines stay in the map) |
 
+### Spawning a Sentinel to look at it
+
+`lualore:mirror_sentinel` has a spawn egg (creative inventory, or
+`/giveme lualore:mirror_sentinel`). A sentinel placed from the egg has no
+`island_key` or `island_pos`, so it does not tether to an island, drops the
+default `everness:crystal_purple` instead of the island variant's crystal,
+and does not mark any island cleared when it dies. Everything else — flight,
+the dogfight attack, the keep-your-distance logic in `do_custom` — behaves
+exactly as it does on a shrine. It is a boss (220–260 HP, armor 140, 5 damage
+a hit), so pick your spot.
+
+To see it in its proper context instead, `/spawn_obsidian_door` builds a whole
+shrine, which spawns a correctly tethered Sentinel once the door is restored.
+
 ## 5. API
 
 ```lua
