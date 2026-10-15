@@ -97,7 +97,7 @@ default, against the 2–6 of a hamlet the sky-site grid builds on its own.
    way to free the Sky Folk — opening it starts the valkyrie fight — so a
    town without one could never be freed. Towns founded by this version
    always get one. A town built before this rule gets its castle the next
-   time a portal leads there:
+   time a portal leads there, including a portal already linked to it:
    - The castle goes on the town's own island if any open ground fits its
      whole 22×22 footprint and height. The middle is tried first, then rings
      outward.

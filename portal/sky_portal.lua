@@ -978,6 +978,20 @@ local function resolve(key, ctx, done, depth)
 			local frame = scan_frame(anchor, dest.axis)
 			if frame and frame.w == dest.w and frame.h == dest.h then
 				light(frame) -- relight it in case it was put out and repaired
+				-- A village portal's town must have its castle. Checked on
+				-- every trip in, not just the first: portals linked to a
+				-- town built before every town had one would otherwise
+				-- never bring it one. Costs nothing once the castle stands.
+				local fb = dest.village and sky_builder()
+				local site, site_key
+				if fb then
+					site, site_key = nearest_village(fb, dest)
+				end
+				if site then
+					return ensure_castle(fb, site_key, site, function()
+						done(dest_key)
+					end)
+				end
 				return done(dest_key)
 			end
 			-- the far end is gone; forget it and look again
