@@ -220,7 +220,13 @@ for _, valkyrie in ipairs(valkyrie_types) do
                 minetest.log("action", "[lualore] Cleared valkyrie strike effects from nearby players on valkyrie death")
             end
 
-            -- Check if all valkyries are defeated and liberate sky folk
+            -- A chest valkyrie counts towards its chest's fight, and the
+            -- fight frees the town when all four are down (valkyrie_fight.lua).
+            -- Any other valkyrie keeps the old rule: when none are left
+            -- nearby, the Sky Folk around are freed.
+            if lualore.valkyrie_fight and lualore.valkyrie_fight.defeated(self) then
+                return
+            end
             if lualore.sky_liberation then
                 minetest.after(0.5, function()
                     lualore.sky_liberation.check_and_liberate(pos)
@@ -229,6 +235,12 @@ for _, valkyrie in ipairs(valkyrie_types) do
         end,
 
         do_custom = function(self, dtime)
+            -- A chest valkyrie reports in to its fight; one whose fight is
+            -- over has removed itself (valkyrie_fight.lua).
+            if lualore.valkyrie_fight
+                    and lualore.valkyrie_fight.heartbeat(self) == "gone" then
+                return false
+            end
             local success, err = pcall(function()
                 if self.enraged and self.rage_timer then
                     self.rage_timer = self.rage_timer - dtime

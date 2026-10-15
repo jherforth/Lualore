@@ -38,7 +38,9 @@ local function spawn_liberation_particles(pos)
 	})
 end
 
-local function free_sky_folk(sky_folk_entity)
+-- quiet: no particles and no log line, for Sky Folk who wake up (or
+-- arrive) in a town that was freed while they were not loaded.
+local function free_sky_folk(sky_folk_entity, quiet)
 	if not sky_folk_entity or not sky_folk_entity.object then
 		return false
 	end
@@ -69,7 +71,7 @@ local function free_sky_folk(sky_folk_entity)
 	end)
 
 	local pos = sky_folk_entity.object:get_pos()
-	if pos then
+	if pos and not quiet then
 		spawn_liberation_particles(pos)
 	end
 
@@ -77,9 +79,13 @@ local function free_sky_folk(sky_folk_entity)
 		lualore.sky_folk_mood.init_npc(sky_folk_entity)
 	end
 
-	minetest.log("action", "[lualore] Sky Folk liberated at " .. minetest.pos_to_string(pos))
+	if not quiet and pos then
+		minetest.log("action", "[lualore] Sky Folk liberated at " .. minetest.pos_to_string(pos))
+	end
 	return true
 end
+
+lualore.sky_liberation.free = free_sky_folk
 
 function lualore.sky_liberation.check_and_liberate(death_pos)
 	local search_radius = 100
@@ -106,6 +112,13 @@ function lualore.sky_liberation.check_and_liberate(death_pos)
 
 		for _, sky_folk in ipairs(sky_folk_to_free) do
 			free_sky_folk(sky_folk)
+		end
+
+		-- Only loaded Sky Folk were freed just now; a town is wider than
+		-- the area Luanti keeps loaded. Mark the town itself free, so the
+		-- rest are freed as they wake (lualore.sky_town).
+		if lualore.sky_town and lualore.sky_town.mark_freed then
+			lualore.sky_town.mark_freed(death_pos)
 		end
 
 		local players = minetest.get_connected_players()

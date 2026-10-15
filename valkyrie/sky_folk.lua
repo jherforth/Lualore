@@ -72,6 +72,11 @@ mobs:register_mob("lualore:sky_folk", {
 	follow = {},
 	view_range = 15,
 	fear_height = 3,
+	-- mobs_redo deletes any monster that is not mid-attack when its area
+	-- unloads ("remove_far_mobs", on by default), and unfreed Sky Folk are
+	-- monsters, so a town emptied every time its players left. A lifetimer
+	-- of 20000 or more is mobs_redo's own way of keeping a mob.
+	lifetimer = 20000,
 	animation = {
 		speed_normal = 30,
 		stand_start = 0,
@@ -148,7 +153,31 @@ mobs:register_mob("lualore:sky_folk", {
 	end,
 
 	do_custom = function(self, dtime)
-		local success, err = pcall(function()
+		local success, result = pcall(function()
+			-- Keep to the island, whatever is moving them (sky_folk_footing.lua).
+			-- When it has just stopped or rescued one, skip mobs_redo's own
+			-- movement this step, so nothing carries it on over the edge.
+			if lualore.sky_folk_footing
+					and lualore.sky_folk_footing.step(self, dtime) == "halted" then
+				return false
+			end
+
+			-- A town is freed as a whole (sky_town_folk.lua). A Sky Folk who
+			-- was not loaded when its valkyries fell, or who arrived since,
+			-- finds out here. (mobs_redo never calls a mob's own on_activate,
+			-- so this cannot be done on waking up.)
+			if not self.liberated and lualore.sky_town and lualore.sky_liberation
+					and lualore.sky_liberation.free then
+				self.sf_town_timer = (self.sf_town_timer or 0) + dtime
+				if self.sf_town_timer >= 5 then
+					self.sf_town_timer = 0
+					local here = self.object:get_pos()
+					if here and lualore.sky_town.freed_at(here) then
+						lualore.sky_liberation.free(self, true)
+					end
+				end
+			end
+
 			if self.liberated then
 				if lualore.sky_folk_mood then
 					lualore.sky_folk_mood.update_mood(self, dtime)
@@ -203,15 +232,6 @@ mobs:register_mob("lualore:sky_folk", {
 						return node and node.name ~= "air" and node.name ~= "ignore"
 					end
 
-					local function count_ground_ahead(p, dir, steps)
-						local count = 0
-						for i = 1, steps do
-							local ahead = vector.add(p, vector.multiply(dir, i))
-							if has_ground_below(ahead) then count = count + 1 end
-						end
-						return count
-					end
-
 					-- Handle state-specific behavior
 					if self.sf_behavior_state == "socializing" and not self.sf_target_reached then
 						-- Look for nearby Sky Folk
@@ -255,25 +275,7 @@ mobs:register_mob("lualore:sky_folk", {
 						self.object:set_velocity({x = 0, y = self.object:get_velocity().y, z = 0})
 					end
 
-					-- Edge avoidance (always active)
-					local vel = self.object:get_velocity()
-					if vel and (math.abs(vel.x) > 0.1 or math.abs(vel.z) > 0.1) then
-						local move_dir = vector.normalize({x = vel.x, y = 0, z = vel.z})
-						local ground_ahead = count_ground_ahead(pos, move_dir, 3)
-						if ground_ahead < 2 then
-							local home = self.sf_home_pos
-							local to_home = vector.normalize({
-								x = home.x - pos.x,
-								y = 0,
-								z = home.z - pos.z,
-							})
-							self.object:set_velocity({
-								x = to_home.x * 1.5,
-								y = vel.y,
-								z = to_home.z * 1.5,
-							})
-						end
-					end
+					-- Edges are handled by sky_folk_footing.lua at the top of do_custom.
 
 					if has_ground_below(pos) then
 						self.sf_home_pos = vector.new(pos.x, pos.y, pos.z)
@@ -324,8 +326,10 @@ mobs:register_mob("lualore:sky_folk", {
 		end)
 
 		if not success then
-			minetest.log("error", "[lualore] Sky Folk do_custom error: " .. tostring(err))
+			minetest.log("error", "[lualore] Sky Folk do_custom error: " .. tostring(result))
+			return
 		end
+		return result
 	end,
 
 	on_die = function(self, pos)

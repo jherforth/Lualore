@@ -1091,6 +1091,14 @@ local function arrive(player, dest_key)
 	if dest.village then
 		minetest.chat_send_player(player:get_player_name(),
 			S("You step out into a sky village. Mind the edge."))
+		-- Fill the town up to its headcount. Wait a few seconds first: the
+		-- town only becomes active around the player once they are there,
+		-- and counting its people before that would count none of them.
+		local fb = sky_builder()
+		local _, town_key = fb and nearest_village(fb, dest)
+		if town_key and lualore.sky_town and lualore.sky_town.populate then
+			minetest.after(4, lualore.sky_town.populate, town_key)
+		end
 	elseif dest.sky then
 		minetest.chat_send_player(player:get_player_name(),
 			S("You step out among the sky islands. Mind the edge."))

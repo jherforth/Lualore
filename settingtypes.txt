@@ -132,6 +132,12 @@ lualore_portal_village_reach (Sky portal village reach) int 800 100 10000
 # 2-6; a portal village is a town. The island grows to fit.
 lualore_portal_village_houses (Sky portal village houses) int 18 6 30
 
+# Sky Folk a portal town is filled to whenever a player arrives through a
+# portal (at most once every two minutes per town). Until its valkyries are
+# defeated a town's Sky Folk are hostile, so a high number makes an
+# unfreed town dangerous.
+lualore_portal_village_folk (Sky portal town population) int 40 0 120
+
 # Largest interior width or height the frame scan will accept. Frames have
 # no real size limit; this only stops the scan following an endless wall of
 # mese.

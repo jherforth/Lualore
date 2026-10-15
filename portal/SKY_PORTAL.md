@@ -260,7 +260,30 @@ the file once no world in use still has players parked on a mirror island.
   - A castle-less town gets its castle on its own island when there is room.
   - A crowded castle-less town gets its castle on a rock joined to the rim.
 
-  Mutations removing the forced castle and the retrofit were each caught. Five mutations were each caught, the last only after the test
+  Mutations removing the forced castle and the retrofit were each caught.
+
+  A third suite (37 checks) runs the real `valkyrie_chest.lua`,
+  `valkyrie_fight.lua`, `sky_liberation.lua`, `sky_town_folk.lua`,
+  `sky_folk.lua` and `sky_folk_footing.lua` on a simulated clock. It covers:
+  - Sky Folk footing: rim, edge, a fall and a two-node step.
+  - Towns freeing their folk.
+  - A town filled to 40 on open ground and topped up after losses, with
+    newcomers to a freed town arriving free.
+  - The whole chest fight:
+    - called off after 20 s away
+    - restarted with all four
+    - stragglers removed
+    - called off after 12 s with a valkyrie missing
+    - won
+    - won chests left alone
+    - old open chests closed, or kept if already freed
+    - a boxed-in chest still releasing all four
+
+  Six mutations were each caught: no rescue, no absence reset, ignoring
+  missing valkyries, keeping stragglers, folk never learning their town is
+  free, and no search for a spawn spot. With missing valkyries ignored, the
+  chest stays open and killing the other three never frees the town, which
+  is the bug players hit. Five mutations were each caught, the last only after the test
   was made to watch every tick:
   - a 2-tall minimum frame
   - counting small hamlets as villages

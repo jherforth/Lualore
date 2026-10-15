@@ -72,7 +72,7 @@ High above the clouds, floating sky villages hold an ancient secret. Valkyries o
 
 Defeat the Valkyries to free the Sky Folk. Once liberated, they'll mark the location of other captive Sky Folk with magical pins and send you on quests to free their companions. Free enough Sky Folk and earn special rewards.
 
-Sky buildings are placed on the floating crystal islands by the same deterministic grid the ground villages use: one site per cell, planned before anything is placed, so houses never overlap and never hang off the island. Most sites are small hamlets — the **skycastle**, which holds the single valkyrie chest, is rolled rarely on top of that. The chest always generates closed; opening it releases four Valkyries at once. Tuning and commands (`/spawn_skysite`, `/find_skysite`) are in `valkyrie/SKY_SITES.md`.
+Sky buildings are placed on the floating crystal islands by the same deterministic grid the ground villages use: one site per cell, planned before anything is placed, so houses never overlap and never hang off the island. Most sites are small hamlets — the **skycastle**, which holds the single valkyrie chest, is rolled rarely on top of that. The chest always generates closed; opening it releases four Valkyries at once. Defeat all four and the chest stays open and the town is freed for good — every Sky Folk in it, including any that were out of range or arrive later. If you die and respawn elsewhere, leave, or a Valkyrie goes missing mid-fight, the survivors withdraw into the chest and it closes, ready for you to try again. Tuning and commands (`/spawn_skysite`, `/find_skysite`) are in `valkyrie/SKY_SITES.md`.
 
 ### 🧑‍🌾 Villagers at Work
 
@@ -108,7 +108,7 @@ Placement uses a deterministic grid (`lualore_ruin_spacing`, `lualore_ruin_chanc
 
 Build an upright rectangle of **mese blocks** — at least 2 wide and 3 tall inside, like a nether portal, and as large as you like beyond that — then **drop an iron ingot into it**. The frame drinks the ingot and fills with a swirling blue sheet. Stand in it for a moment and you are carried up to a **sky village**; a portal built up there takes you back down.
 
-- Each portal leads to a **sky town** of 18 houses with its Sky Folk and **one skycastle**. Opening the castle's valkyrie chest starts the fight that frees them; it is the only way. If there isn't one within 800 nodes, the first trip raises a crystal island overhead and founds one there. Later portals nearby lead to the same town.
+- Each portal leads to a **sky town** of 18 houses with its Sky Folk and **one skycastle**. Opening the castle's valkyrie chest starts the fight that frees them; it is the only way. If there isn't one within 800 nodes, the first trip raises a crystal island overhead and founds one there. Later portals nearby lead to the same town, which is kept at 40 Sky Folk. Sky Folk no longer walk off island edges.
 - Every portal gets its own portal in the town and leads back to the right base, so two players' homes never share a way back.
 - Break any frame block and the sheet goes out. Relight it with another ingot and it keeps its link.
 - Luanti has no separate dimensions, so the sky islands are the floatlands of the same world — the portal is a way up, not a way out. Mind the edges.

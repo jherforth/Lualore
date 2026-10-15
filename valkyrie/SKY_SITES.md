@@ -116,6 +116,75 @@ standing town:
   that for a rock it raises beside a town with no room left.
 - It closes the valkyrie chest and records `castle = 1`.
 
+## Sky Folk
+
+**Population.** A portal town is topped up to `lualore_portal_village_folk`
+Sky Folk (default 40) a few seconds after a player steps out of a portal
+there, once the town is active around them. The top-up runs at most once
+every two minutes per town. Newcomers are placed (`valkyrie/sky_town_folk.lua`):
+- on open island ground with two nodes of headroom,
+- under open sky, so never inside a house or the castle,
+- with ground two nodes out on every side, so never on the rim,
+- between 6 and 44 nodes from the middle.
+
+Sky Folk carry `lifetimer = 20000`. Unfreed Sky Folk are monsters, and
+mobs_redo deletes any monster that isn't mid-attack when its area unloads,
+so before this a hostile town emptied whenever its players left. Until its
+valkyries are defeated, a town's Sky Folk are hostile, so a large population
+makes an unfreed town dangerous.
+
+**Edges** (`valkyrie/sky_folk_footing.lua`). Sky Folk used to walk off
+islands because most of what moves them never looks at the ground:
+- their own `do_custom` sets their velocity directly,
+- they chase players,
+- they get knocked back,
+- they jump.
+
+So the guard works on what is actually happening to the mob, whatever moved
+it:
+- One moving towards a drop deeper than 3 nodes is stopped and turned
+  round, and mobs_redo's own movement is skipped for that step.
+- One that goes over anyway is caught once it is falling with no ground
+  within 4 nodes, and is put back on the last ground it stood on well
+  inside the island.
+
+**Freedom is per town.** Luanti only keeps entities active about 64 nodes
+around a player, and a town is wider than that, so a radius check alone
+never reaches the far side. When a town's valkyries are defeated, the town
+record is marked `liberated = 1`. Any Sky Folk of that town that wakes up
+later, or arrives through a top-up, is free too: it checks every five
+seconds.
+
+## The valkyrie chest fight
+
+`valkyrie/valkyrie_fight.lua`. Opening a chest starts a tracked fight with
+its four valkyries.
+
+| What happens | Result |
+|---|---|
+| All four are defeated | The chest stays open for good (`won = 1`) and the town is freed. |
+| No player within 64 nodes for 20 seconds (died and respawned elsewhere, or left) | The fight is called off. |
+| A valkyrie still to be defeated goes unseen for 12 seconds while players are there (mobs_redo deleted it, or it is lost) | The fight is called off. |
+
+**Called off** means the valkyries still loaded are drawn back into the
+chest and the chest closes. The player who opened it is told. Opening it
+again is a fresh fight against all four.
+
+**Stragglers.** Every valkyrie carries its chest and fight id, and reports
+in from its `do_custom`. One that wakes up after its fight is over removes
+itself, so a reopened chest never meets stragglers.
+
+**Spawning.** A chest in a cramped room used to leave a valkyrie unspawned
+when its spot was blocked, and that fight could never be won. Each valkyrie
+now searches nearby for room. One with no room at all is dropped from the
+fight rather than left as one the player can't defeat.
+
+**Chests left open.** An open chest with no fight going and no victory
+behind it closes when it next loads; a load-time check also clears chests
+opened before this was tracked, whose valkyries are long gone. A chest whose
+town is already free stays open and is marked won. That includes towns
+freed under the old rules, recognised by freed Sky Folk standing nearby.
+
 ## Settings
 
 | Setting | Default | Meaning |

@@ -1016,6 +1016,10 @@ lualore.floating_buildings = {
 	end,
 	-- Give a standing site its castle (see add_castle above).
 	add_castle = add_castle,
+	-- Write the records back after changing one in place.
+	save = function()
+		storage:set_string("sky_sites", minetest.serialize(records))
+	end,
 	enabled = ENABLED,
 	spacing = SPACING,
 	y_min = Y_MIN,
