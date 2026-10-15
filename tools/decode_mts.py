@@ -2,7 +2,7 @@
 """Decode a Luanti .mts schematic into human-readable layers.
 
 Usage:
-    python tools/decode_mts.py schematics/obsidiandoor1.mts
+    python tools/decode_mts.py schematics/skycastle.mts
 
 Prints size, name table, y-slice probabilities and a layer-by-layer
 ASCII map so the geometry can be verified without starting the game.

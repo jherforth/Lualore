@@ -81,8 +81,8 @@ at dusk. Each trade does something you can use: the **blacksmith** mends worn to
 anvil, the **cleric** will make a village your respawn point for a mese crystal, the **farmer**
 works a real field you can also harvest, the **fisherman** fills his trap, the **jeweler**
 turns out valuables drawn from the local biome, the **entertainer** keeps the village's spirits
-up, and the **vagrant** — who has nothing to sell — will tell you where to find a ruin, a sky
-site or an obsidian shrine in exchange for a meal.
+up, and the **vagrant** — who has nothing to sell — will tell you where to find a ruin, a village
+or a sky site in exchange for a meal.
 
 Villages remember you. Feeding, trading and using what villagers make builds **standing**, and
 a village that knows you shares more of what it makes. It can only go up. See
@@ -104,16 +104,15 @@ Broken castles, ruined towers, collapsed wall fragments and ancient stone circle
 
 Placement uses a deterministic grid (`lualore_ruin_spacing`, `lualore_ruin_chance` settings) and keeps a respectful distance from villages. `/spawn_ruin` builds one at your feet, `/find_ruin` locates the nearest — see `ruins/RUINS.md` for tuning and how to add your own ruin themes.
 
-### ⬛ The Obsidian Door Trials
+### 🌀 Sky Portals
 
-In dry, rugged lands — deserts, mesas, forsaken deserts, savannas, prairies and outbacks — you may stumble upon **ruined obsidian door shrines**: small obsidian cubes with half of their blocks missing. Each one is clearly an unfinished schematic, with a crystal still standing on top and a doorway waiting to be completed.
+Build an upright rectangle of **mese blocks** — at least 2 wide and 3 tall inside, like a nether portal, and as large as you like beyond that — then **drop an iron ingot into it**. The frame drinks the ingot and fills with a swirling blue sheet. Stand in it for a moment and you are carried up to the **sky islands**; a portal built up there takes you back down.
 
-- **Restore the shrine** with the **exact same blocks** it was built from — the missing spots must be filled with the shrine's own material (glow obsidian, obsidian or obsidian glass), and if the top crystal is among the missing blocks you will need to match its everness crystal color. The doorway reports its progress: stand close and it hums faintly, telling you how many blocks remain.
-- **Complete it and the doorway awakens.** Step up to the restored door to be carried to a floating island high above the world, where the same door stands **mirrored** — guarded by the **Mirror Sentinel**, an original flying construct of obsidian and mirror glass that fights with blinding curses.
-- **Defeat the Sentinel** and it shatters: a treasure chest (filled by the loot system) appears beside the mirror door, and the Sentinel drops its shrine's crystal plus mese and diamonds.
-- **The mirror door brings you home** to the shrine you came from. It opens once the Sentinel is gone — and never locks you out: after 45 seconds it opens regardless, so you can always leave.
+- The first trip finds an island with room overhead (favouring a known sky site nearby), builds a matching portal there and links the two. If there is no island to land on, it builds a small obsidian platform instead.
+- Break any frame block and the sheet goes out. Relight it with another ingot and it keeps its link.
+- Luanti has no separate dimensions, so the sky islands are the floatlands of the same world — the portal is a way up, not a way out. Mind the edges.
 
-Shrines spawn on their own grid (`lualore_door_spacing`, `lualore_door_chance`), keep their distance from villages and only appear in the dry biome families. `/spawn_obsidian_door` builds one at your feet, `/find_obsidian_door` locates the nearest — see `ruins/OBSIDIAN_DOORS.md` for the full guide.
+**Mirror Sentinels** — hovering obelisk constructs that cast blinding curses — wander the sky islands. They drop mese, which is what the next portal frame is made of. `/sky_portals` lists the portals near you and where each one leads — see `portal/SKY_PORTAL.md` for the full guide.
 
 ### 🚪 Smart Doors
 

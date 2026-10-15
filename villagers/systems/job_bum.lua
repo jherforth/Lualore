@@ -6,11 +6,10 @@
 -- country: feed him and he tells you about somewhere worth going, and
 -- marks it on your view.
 --
--- Everything he knows already exists. The village placer, the ruins, the
--- obsidian door shrines and the sky sites each keep a record of what
--- they have built, for their own /find_ commands. He reads those, skips
--- anything you have already been told about, and picks the nearest thing
--- you have not seen.
+-- Everything he knows already exists. The village placer, the ruins and
+-- the sky sites each keep a record of what they have built, for their
+-- own /find_ commands. He reads those, skips anything you have already
+-- been told about, and picks the nearest thing you have not seen.
 --
 -- That makes him the one villager who connects the rest of the mod
 -- together, which is worth more than any item he could hand over.
@@ -69,12 +68,6 @@ local function gather_secrets()
 	collect(records_from("ruins"), "ruin", "Ruin", 0xBBAA88)
 	collect(records_from("villages"), "village", "Village", 0x88FF88)
 
-	if lualore.obsidian_doors and lualore.obsidian_doors.get_records then
-		local ok, recs = pcall(lualore.obsidian_doors.get_records)
-		if ok then
-			collect(recs, "door", "Obsidian shrine", 0xCC88FF)
-		end
-	end
 	if lualore.floating_buildings and lualore.floating_buildings.records then
 		local ok, recs = pcall(lualore.floating_buildings.records)
 		if ok then
@@ -103,7 +96,6 @@ end
 local FLAVOUR = {
 	ruin = "\"Old stones out @1 of here, half fallen. Nobody's picked them clean.\"",
 	village = "\"There's folk living @1 of here. Might be they'd trade.\"",
-	door = "\"Saw a black doorway @1 of here. Wrong-looking thing. Didn't stay.\"",
 	sky = "\"Look up, @1 of here. There's houses in the clouds, I swear it.\"",
 }
 

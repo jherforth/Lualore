@@ -110,9 +110,9 @@ to its workstation.
 ### The vagrant is the interesting one
 
 He has nothing to sell. What he has is knowing the country: feed him and he marks a ruin, a
-village, an obsidian shrine or a sky site you have not seen, as a waypoint, with a line about
-which way to go. Everything he knows already existed — the village placer, the ruins, the
-obsidian doors and the sky sites each keep records for their own `/find_` commands, and he
+village or a sky site you have not seen, as a waypoint, with a line about
+which way to go. Everything he knows already existed — the village placer, the ruins and
+the sky sites each keep records for their own `/find_` commands, and he
 reads those. He holds off once you are carrying three unvisited marks, and skips anything
 within 60 nodes as not worth mentioning.
 

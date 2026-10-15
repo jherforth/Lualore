@@ -107,33 +107,29 @@ lualore_ruin_y_max (Ruin search band top) int 200 -31000 31000
 lualore_ruin_y_min (Ruin search band bottom) int -2 -31000 31000
 
 # -------------------------------------------------------------------
-# Obsidian door trials (see ruins/OBSIDIAN_DOORS.md)
+# Sky portals (see portal/SKY_PORTAL.md)
 # -------------------------------------------------------------------
 
-# Enable broken obsidian door shrines in dry/rugged biomes. Restoring a
-# shrine with its exact original blocks awakens it and opens the way to a
-# mirror door guarded by a boss on a floating island.
-lualore_obsidian_doors (Obsidian door shrines) bool true
+# Mese block frames that light when an iron ingot is dropped into them,
+# leading to the sky islands and back. Portals already in a world stay
+# visible when this is off; they simply stop lighting and carrying anyone.
+lualore_sky_portals (Sky portals) bool true
 
-# Grid spacing (in nodes) between shrine candidates. One candidate exists
-# per spacing x spacing area, jittered in the middle half of the cell, so
-# two shrines can never be closer together than half this value.
-lualore_door_spacing (Obsidian door spacing) int 450 200 5000
+# Seconds a player has to stand in a portal before it carries them.
+lualore_portal_delay (Sky portal delay) float 2.0 0.0 10.0
 
-# Fraction of grid cells that actually attempt to spawn a shrine (0.0 - 1.0).
-lualore_door_chance (Obsidian door spawn chance) float 0.7 0.0 1.0
+# Height from which a portal counts as being in the sky: portals at or
+# above it lead down, portals below it lead up, and the search for an
+# island starts here. Asuna's floatlands begin at y = 287.
+lualore_portal_sky_y (Sky portal sky height) int 290 0 30000
 
-# Fraction of the shrine's frame blocks that start out missing (0.1 - 0.9).
-lualore_door_missing (Obsidian door missing share) float 0.5 0.1 0.9
+# Largest interior width or height the frame scan will accept. Frames have
+# no real size limit; this only stops the scan following an endless wall of
+# mese.
+lualore_portal_max_size (Sky portal maximum size) int 256 3 1024
 
-# Spawn the Mirror Sentinel boss on the floating island.
-lualore_door_boss (Obsidian door boss) bool true
-
-# Shrines are searched for between these Y levels (surface band).
-lualore_door_y_max (Obsidian door search band top) int 200 -31000 31000
-
-# Lower Y limit of the shrine search band (lower number = deeper).
-lualore_door_y_min (Obsidian door search band bottom) int -2 -31000 31000
+# Mirror Sentinels wander the sky islands (above lualore_portal_sky_y).
+lualore_mirror_sentinels (Mirror Sentinels) bool true
 
 # -------------------------------------------------------------------
 # Sky sites (deterministic grid placement on the floating crystal

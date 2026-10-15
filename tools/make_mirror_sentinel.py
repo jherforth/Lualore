@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Mirror Sentinel boss model and texture for lualore.
+"""Generate the Mirror Sentinel model and texture for lualore.
 
 Outputs
 -------

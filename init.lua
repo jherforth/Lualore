@@ -112,9 +112,6 @@ dofile(modpath .. "/villagers/extras/loot.lua")
 -- 6b. Procedural ruins (broken castles, towers, walls, stone circles)
 dofile(modpath .. "/ruins/ruins.lua")
 
--- 6c. Obsidian door trials (restorable shrines; mirror door boss island)
-dofile(modpath .. "/ruins/obsidian_doors.lua")
-
 -- 7. Valkyrie and Sky Folk systems
 dofile(modpath .. "/valkyrie/valkyrie_strikes.lua")
 dofile(modpath .. "/valkyrie/sky_folk_pins.lua")
@@ -129,6 +126,13 @@ dofile(modpath .. "/valkyrie/valkyrie_chest.lua")
 dofile(modpath .. "/valkyrie/sky_folk.lua")
 dofile(modpath .. "/valkyrie/sky_villages.lua")
 dofile(modpath .. "/valkyrie/floating_buildings.lua")
+dofile(modpath .. "/valkyrie/mirror_sentinel.lua")
+
+-- 7b. Sky portals (mese frames lit with an iron ingot; lead to the sky
+--     islands and back). legacy_doors rescues players left on the old
+--     obsidian door mirror islands.
+dofile(modpath .. "/portal/sky_portal.lua")
+dofile(modpath .. "/portal/legacy_doors.lua")
 
 -- 8. Custom mob spawning (if exists)
 if mobs.custom_spawn_lualore then
@@ -140,5 +144,5 @@ end
 -- ===================================================================
 
 minetest.log("action", "[lualore] Successfully loaded — " ..
-    "6 biomes | perfect villages | villagers | cave wizards | cave lits | procedural ruins | obsidian doors | sky valkyries | sky folk | exploding toads")
+    "6 biomes | perfect villages | villagers | cave wizards | cave lits | procedural ruins | sky portals | sky valkyries | sky folk | exploding toads")
 print(S("[MOD] lualore loaded — a living world awaits you"))
