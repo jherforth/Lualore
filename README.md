@@ -108,7 +108,7 @@ Placement uses a deterministic grid (`lualore_ruin_spacing`, `lualore_ruin_chanc
 
 Build an upright rectangle of **mese blocks** — at least 2 wide and 3 tall inside, like a nether portal, and as large as you like beyond that — then **drop an iron ingot into it**. The frame drinks the ingot and fills with a swirling blue sheet. Stand in it for a moment and you are carried up to a **sky village**; a portal built up there takes you back down.
 
-- Each portal leads to a **sky town** of 18 houses, with Sky Folk and sometimes a skycastle. If there isn't one within 800 nodes, the first trip raises a crystal island overhead and founds one there. Later portals nearby lead to the same town.
+- Each portal leads to a **sky town** of 18 houses with its Sky Folk and **one skycastle**. Opening the castle's valkyrie chest starts the fight that frees them; it is the only way. If there isn't one within 800 nodes, the first trip raises a crystal island overhead and founds one there. Later portals nearby lead to the same town.
 - Every portal gets its own portal in the town and leads back to the right base, so two players' homes never share a way back.
 - Break any frame block and the sheet goes out. Relight it with another ingot and it keeps its link.
 - Luanti has no separate dimensions, so the sky islands are the floatlands of the same world — the portal is a way up, not a way out. Mind the edges.

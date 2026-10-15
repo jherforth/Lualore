@@ -858,6 +858,102 @@ if ENABLED then
 end
 
 -- ------------------------------------------------------------------
+-- Adding a castle to a standing site
+-- ------------------------------------------------------------------
+-- Is the space above the floor open - nothing but air and plants? The
+-- island grid alone cannot tell: inside a house the first solid node down
+-- from the read window is the house's own floor, which looks like island.
+local function volume_open(minx, maxx, minz, maxz, y_lo, y_hi)
+	local vm = minetest.get_voxel_manip()
+	local emin, emax = vm:read_from_map({x = minx, y = y_lo, z = minz},
+		{x = maxx, y = y_hi, z = maxz})
+	local data = vm:get_data()
+	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
+	for z = minz, maxz do
+		for y = y_lo, y_hi do
+			for x = minx, maxx do
+				local class = classify(data[area:index(x, y, z)])
+				if class ~= "air" and class ~= "soft" then
+					return false
+				end
+			end
+		end
+	end
+	return true
+end
+
+-- Give a standing site its castle. A portal town must have one - opening
+-- its valkyrie chest starts the fight that frees the Sky Folk - and a town
+-- that was built without one already has houses standing, with no record
+-- of where. So the castle goes wherever the island has open ground for its
+-- whole footprint and height: the middle first, then rings outward. With
+-- opts.at = {x = , z = } only that spot is tried (a rock raised beside the
+-- town for it). Returns true once the site has a castle, false if nowhere
+-- fits. The area must already be loaded.
+local function add_castle(key, opts)
+	opts = opts or {}
+	local site = records[key]
+	if not site then
+		return false
+	end
+	if site.castle == 1 then
+		return true
+	end
+	local size = get_size(SKY_PALETTE.castle)
+	if not size then
+		return false
+	end
+	local floor_y = site.y
+	local cx = opts.at and opts.at.x or site.x
+	local cz = opts.at and opts.at.z or site.z
+	local read_r = opts.at and 24 or 72
+	local grid, span = read_island(cx, cz, floor_y, read_r)
+	if not grid then
+		return false
+	end
+
+	local spots = {{0, 0}}
+	if not opts.at then
+		for r = 8, read_r - 12, 6 do
+			local n = math.max(8, math.floor(r / 2))
+			for i = 0, n - 1 do
+				local a = i * 2 * math.pi / n
+				spots[#spots + 1] = {math.floor(math.cos(a) * r + 0.5),
+					math.floor(math.sin(a) * r + 0.5)}
+			end
+		end
+	end
+
+	local base_y = floor_y + (SKY_PALETTE.offset or 0)
+	local top_y = base_y + size.y - 1
+	local ext_x, ext_z = rotated_extent(size, 0)
+	for _, off in ipairs(spots) do
+		local minx, minz = placement_origin(cx + off[1], cz + off[2], size, 0)
+		local maxx, maxz = minx + ext_x - 1, minz + ext_z - 1
+		if footprint_ok(grid, span, read_r, cx, cz, minx, minz, ext_x, ext_z, floor_y)
+				and volume_open(minx, maxx, minz, maxz, floor_y + 1, top_y) then
+			local plan = {
+				minx = minx, maxx = maxx, minz = minz, maxz = maxz,
+				file = SKY_PALETTE.castle, rot = 0,
+				base_y = base_y, castle = true,
+			}
+			minetest.place_schematic({x = minx, y = base_y, z = minz},
+				MODPATH .. "/schematics/" .. plan.file, "0", nil, true)
+			pour_foundation(plan, SKY_PALETTE.fill)
+			site.castle = 1
+			site.chest = place_castle_chest(plan)
+			storage:set_string("sky_sites", minetest.serialize(records))
+			minetest.log("action", string.format(
+				"[lualore] Skycastle added to sky site %s at %d,%d,%d (%s)",
+				key, cx + off[1], floor_y, cz + off[2],
+				site.chest > 0 and "chest" or "NO CHEST"))
+			return true
+		end
+	end
+	return false
+end
+
+-- ------------------------------------------------------------------
 -- Public API
 -- ------------------------------------------------------------------
 lualore.floating_buildings = {
@@ -918,6 +1014,8 @@ lualore.floating_buildings = {
 			planted or 0))
 		return true, records[key], key
 	end,
+	-- Give a standing site its castle (see add_castle above).
+	add_castle = add_castle,
 	enabled = ENABLED,
 	spacing = SPACING,
 	y_min = Y_MIN,

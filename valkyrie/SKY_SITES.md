@@ -104,6 +104,18 @@ for every six houses out on its ring.
 Portals only count `big` villages as destinations, so the grid's own
 hamlets stay quiet places to find by flying.
 
+A portal town always has a skycastle: the portal founds it with
+`force_castle`, because the castle's valkyrie chest is the only way to
+free the Sky Folk. For a town that was built without one,
+`lualore.floating_buildings.add_castle(key, opts)` places a castle into the
+standing town:
+- It looks for open ground first: the middle, then rings outward.
+- It checks the castle's whole volume is open air, not just its floor. The
+  island height grid alone would take a house's own floor for island.
+- With `opts.at = {x = , z = }` it tries one spot only. The portal uses
+  that for a rock it raises beside a town with no room left.
+- It closes the valkyrie chest and records `castle = 1`.
+
 ## Settings
 
 | Setting | Default | Meaning |

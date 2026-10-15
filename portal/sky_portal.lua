@@ -15,7 +15,7 @@
 	Luanti has no dimensions, so "the sky islands" are the floatlands of this
 	same world, which Asuna generates between y = 287 and y = 28000. A portal
 	built on the ground leads up to a SKY VILLAGE - a hamlet of sky houses
-	with its Sky Folk, sometimes a castle:
+	with its Sky Folk and always one skycastle:
 
 	  * If a sky village already stands within reach (600 nodes by default,
 	    never less than one sky-site grid cell), the portal goes there.
@@ -93,12 +93,19 @@ local SITE_BAND = 48       -- vertical half-height searched around a village
 local GROUND_FLOOR = -48   -- bottom of the box searched for ground
 local PLATFORM = "default:obsidian"
 
--- A founded village's island: wide enough for the whole cluster with a
--- rim to walk round, and deep enough to look like it has weight. The
--- castle is left to its usual roll - it holds the valkyrie chest and is
--- meant to stay rare.
-local ISLAND_R = VILLAGE_RADIUS + 6
+-- Every portal town has exactly one skycastle. Its valkyrie chest is the
+-- only way to free the Sky Folk - opening it starts the valkyrie fight - so
+-- a town without one would be a town nobody could ever free.
+--
+-- A founded village's island: wide enough for the castle in the middle,
+-- the ring of houses round it and a rim to walk on, and deep enough to look
+-- like it has weight.
+local ISLAND_R = VILLAGE_RADIUS + 12
 local ISLAND_DEPTH = 26    -- deepest point of its underside
+-- A town built without a castle, with no room left on its island, gets a
+-- rock of this size joined to its rim to put the castle on.
+local CASTLE_ROCK_R = 22
+local CASTLE_ROCK_DEPTH = 16
 local ISLAND_HEADROOM = 28 -- open air wanted above it for the houses
 -- Heights tried for a founded village, above the sky-site band's floor, in
 -- order, until one has open sky; the floatlands overhead may be in the way.
@@ -727,22 +734,22 @@ local function nearest_village(fb, near)
 	if not ok or type(sites) ~= "table" then
 		return nil
 	end
-	local best, best_d
-	for _, site in pairs(sites) do
+	local best, best_key, best_d
+	for site_key, site in pairs(sites) do
 		if type(site) == "table" and site.big == 1
 				and site.x and site.y and site.z then
 			local d = math.hypot(site.x - near.x, site.z - near.z)
 			if d <= reach and (not best_d or d < best_d) then
-				best, best_d = site, d
+				best, best_key, best_d = site, site_key, d
 			end
 		end
 	end
-	return best
+	return best, best_key
 end
 
-local function island_box(cx, y, cz)
-	local r = ISLAND_R + 6 -- the outline bulges past its mean radius
-	return {x = cx - r, y = y - ISLAND_DEPTH - 3, z = cz - r},
+local function island_box(cx, y, cz, radius, depth)
+	local r = (radius or ISLAND_R) + 6 -- the outline bulges past its mean
+	return {x = cx - r, y = y - (depth or ISLAND_DEPTH) - 3, z = cz - r},
 		{x = cx + r, y = y + ISLAND_HEADROOM, z = cz + r}
 end
 
@@ -773,11 +780,13 @@ end
 -- The outline comes from the village ground module, so it is lobed rather
 -- than round, and the underside tapers to a rough point. Only air is
 -- filled; anything already there stays.
-local function raise_island(cx, y, cz, seed)
+local function raise_island(cx, y, cz, seed, radius, depth_max)
+	radius = radius or ISLAND_R
+	depth_max = depth_max or ISLAND_DEPTH
 	local ground = lualore.village_ground
 	local shape = ground and ground.new_shape
-		and ground.new_shape(seed, ISLAND_R, ISLAND_R * 0.8, 0)
-	local minp, maxp = island_box(cx, y, cz)
+		and ground.new_shape(seed, radius, radius * 0.8, 0)
+	local minp, maxp = island_box(cx, y, cz, radius, depth_max)
 	local vm = minetest.get_voxel_manip()
 	local emin, emax = vm:read_from_map(minp, maxp)
 	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
@@ -794,16 +803,16 @@ local function raise_island(cx, y, cz, seed)
 		for x = cx - reach, cx + reach do
 			local dx, dz = x - cx, z - cz
 			local d = math.sqrt(dx * dx + dz * dz)
-			local r = ISLAND_R
+			local r = radius
 			if shape and d > 0 then
 				r = (shape:profile(dx, dz))
 			end
 			if d <= r then
 				local edge = 1 - d / r
 				local n = roughness:get_2d({x = x, y = z})
-				local depth = 2 + math.floor(ISLAND_DEPTH * edge ^ 0.75
+				local depth = 2 + math.floor(depth_max * edge ^ 0.75
 					* (0.8 + 0.25 * n) + 0.5)
-				depth = math.min(depth, ISLAND_DEPTH + 2)
+				depth = math.min(depth, depth_max + 2)
 				for yy = y - depth, y do
 					local i = area:index(x, yy, z)
 					if data[i] == c_air then
@@ -825,7 +834,7 @@ end
 
 -- Found a village above `column`: try each height in turn until one has
 -- open sky, raise an island there and have the sky-site builder put a
--- village on it. Calls done(site) or done(nil).
+-- village on it, castle and all. Calls done(site, key) or done(nil).
 local function found_village(fb, column, protected_by, done)
 	local base = fb.y_min or 500
 	local seed = (column.x * 73856093 + column.z * 19349663) % 2147483647
@@ -847,15 +856,16 @@ local function found_village(fb, column, protected_by, done)
 				return try_next()
 			end
 			raise_island(column.x, y, column.z, seed)
-			local ok, site = fb.found_at(column.x, column.z, {
+			local ok, site, site_key = fb.found_at(column.x, column.z, {
 				top = y + 1, bottom = y - 1, seed = seed,
 				big = true,
+				force_castle = true,
 				houses = VILLAGE_HOUSES,
 				max_radius = VILLAGE_RADIUS,
 				tries = 16, -- a crowded ring needs more goes per house
 			})
 			if ok == true and type(site) == "table" then
-				return done(site)
+				return done(site, site_key)
 			end
 			minetest.log("warning", "[lualore] Sky portal raised an island at " ..
 				minetest.pos_to_string({x = column.x, y = y, z = column.z}) ..
@@ -864,6 +874,78 @@ local function found_village(fb, column, protected_by, done)
 		end)
 	end
 	try_next()
+end
+
+-- How far the town's island reaches from its middle along angle `a`, by
+-- walking out along its floor until the floor stops.
+local function rim_along(site, a)
+	local reach = 0
+	for r = 4, ISLAND_R * 2 do
+		local x = site.x + math.floor(math.cos(a) * r + 0.5)
+		local z = site.z + math.floor(math.sin(a) * r + 0.5)
+		local name = node_name({x = x, y = site.y, z = z})
+		if name == "air" or name == "ignore" then
+			break
+		end
+		reach = r
+	end
+	return reach
+end
+
+-- Is a box nothing but air and plants? (the castle's volume, before any
+-- rock is raised for it)
+local function volume_clear(minp, maxp)
+	local vm = minetest.get_voxel_manip()
+	local emin, emax = vm:read_from_map(minp, maxp)
+	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
+	local data = vm:get_data()
+	for z = minp.z, maxp.z do
+		for y = minp.y, maxp.y do
+			for x = minp.x, maxp.x do
+				if class_of(data[area:index(x, y, z)]) ~= "clear" then
+					return false
+				end
+			end
+		end
+	end
+	return true
+end
+
+-- Every portal town has its castle. A town founded with one already does;
+-- a town built before that rule gets one now - on its own island if any
+-- open ground fits it, otherwise on a rock raised for it and joined to the
+-- island's rim, beyond the houses. Calls done() either way.
+local function ensure_castle(fb, key, site, done)
+	if site.castle == 1 or not (fb.add_castle and key) then
+		return done()
+	end
+	local r = ISLAND_R + CASTLE_ROCK_R * 2 + 8
+	local minp = {x = site.x - r, y = site.y - ISLAND_DEPTH - 4, z = site.z - r}
+	local maxp = {x = site.x + r, y = site.y + 24, z = site.z + r}
+	emerge_then(minp, maxp, function()
+		if fb.add_castle(key) then
+			return done()
+		end
+		local seed = (site.x * 19349663 + site.z * 83492791) % 2147483647
+		for i = 0, 7 do
+			local a = i * math.pi / 4
+			-- overlap the rim by a third of the rock, so the two are joined
+			local d = rim_along(site, a) + math.floor(CASTLE_ROCK_R * 2 / 3)
+			local cx = site.x + math.floor(math.cos(a) * d + 0.5)
+			local cz = site.z + math.floor(math.sin(a) * d + 0.5)
+			if volume_clear({x = cx - 12, y = site.y + 1, z = cz - 12},
+					{x = cx + 12, y = site.y + 20, z = cz + 12}) then
+				raise_island(cx, site.y, cz, seed + i, CASTLE_ROCK_R,
+					CASTLE_ROCK_DEPTH)
+				if fb.add_castle(key, {at = {x = cx, z = cz}}) then
+					return done()
+				end
+			end
+		end
+		minetest.log("warning", "[lualore] Sky town " .. key ..
+			" has no castle and no room for one")
+		return done()
+	end)
 end
 
 -- ------------------------------------------------------------------
@@ -934,17 +1016,20 @@ local function resolve(key, ctx, done, depth)
 		end)
 	end
 
-	-- Open ground as near the village's middle as possible. A village whose
-	-- ground is all taken sends the portal to the column search instead of
-	-- clearing a platform among its houses.
-	local function land_in_village(site)
-		search({x = site.x, y = site.y, z = site.z}, true, true, ctx.name,
-			function(frame)
-				if frame then
-					return settle(frame, true)
-				end
-				return fall_back_to_column()
-			end)
+	-- Make sure the town has its castle, then land on open ground as near
+	-- its middle as possible. A village whose ground is all taken sends the
+	-- portal to the column search instead of clearing a platform among its
+	-- houses.
+	local function land_in_village(fb, site, site_key)
+		ensure_castle(fb, site_key, site, function()
+			search({x = site.x, y = site.y, z = site.z}, true, true, ctx.name,
+				function(frame)
+					if frame then
+						return settle(frame, true)
+					end
+					return fall_back_to_column()
+				end)
+		end)
 	end
 
 	if not going_up then
@@ -961,16 +1046,16 @@ local function resolve(key, ctx, done, depth)
 	if not fb then
 		return fall_back_to_column()
 	end
-	local site = nearest_village(fb, column)
+	local site, site_key = nearest_village(fb, column)
 	if site then
-		return land_in_village(site)
+		return land_in_village(fb, site, site_key)
 	end
 	if ctx.say then
 		ctx.say(S("Far above, an island gathers itself out of the clouds..."))
 	end
-	found_village(fb, column, ctx.name, function(new_site)
+	found_village(fb, column, ctx.name, function(new_site, new_key)
 		if new_site then
-			return land_in_village(new_site)
+			return land_in_village(fb, new_site, new_key)
 		end
 		return fall_back_to_column()
 	end)

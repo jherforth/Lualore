@@ -85,16 +85,28 @@ default, against the 2–6 of a hamlet the sky-site grid builds on its own.
      is sized to the town: a mean radius of 66 nodes for 18 houses.
      Only air is filled; nothing already there is carved away.
    - It has the sky-site builder (`valkyrie/floating_buildings.lua`) put the
-     town on it: houses on a lobed ring with paths and planting, and the
-     **skycastle** on its usual 15% roll. The castle holds the valkyrie
-     chest and is meant to stay rare.
+     town on it: **one skycastle in the middle**, always, with the houses on
+     a lobed ring around it and paths and planting between them.
    - The village is recorded like any grid-built site, flagged `big`. If its
      grid cell is still free it takes that cell, so the grid never builds a
      hamlet beside it.
    - **Sky Folk** arrive around the middle as usual, plus a group for every
      six houses out on the ring (three more groups for 18 houses), so the
      edges aren't empty.
-3. **The portal is built in the village**, on open ground as near the middle
+3. **Every town has its castle.** The castle's valkyrie chest is the only
+   way to free the Sky Folk — opening it starts the valkyrie fight — so a
+   town without one could never be freed. Towns founded by this version
+   always get one. A town built before this rule gets its castle the next
+   time a portal leads there:
+   - The castle goes on the town's own island if any open ground fits its
+     whole 22×22 footprint and height. The middle is tried first, then rings
+     outward.
+   - If the houses fill the island, the castle is put on a rock raised
+     beside the town. The rock overlaps the rim by a third of its width, so
+     you can walk across with no gap to jump.
+   - The castle ships with its chest saved open in the schematic; the
+     builder closes it, so it is always ready to start the fight.
+4. **The portal is built in the village**, on open ground as near the middle
    as possible. Height counts heavily in that search: a flat house roof in
    the middle loses to the ground a few houses out.
 
@@ -234,7 +246,21 @@ the file once no world in use still has players parked on a mirror island.
   without stealing its link, moving up when a floatland blocks the first
   height, ignoring small hamlets, using an existing town 700 nodes away,
   and falling back when sky buildings are off. The sky-site builder was
-  stubbed. Five mutations were each caught, the last only after the test
+  stubbed in those checks.
+
+  A second suite loads the **real** `floating_buildings.lua` (16 checks;
+  only `place_schematic` is a stand-in, building hollow shells and dropping
+  an open valkyrie chest into the castle the way the real schematic does).
+  It shows:
+  - A portal-founded town gets all 18 houses and exactly one castle, with
+    one closed chest.
+  - The castle comes with the founding, not from the retrofit, in five towns
+    out of five (the plain 15% roll would manage that about once in
+    thirteen thousand tries).
+  - A castle-less town gets its castle on its own island when there is room.
+  - A crowded castle-less town gets its castle on a rock joined to the rim.
+
+  Mutations removing the forced castle and the retrofit were each caught. Five mutations were each caught, the last only after the test
   was made to watch every tick:
   - a 2-tall minimum frame
   - counting small hamlets as villages
