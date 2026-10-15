@@ -1208,6 +1208,17 @@ mobs:register_mob("lualore:mirror_sentinel", {
 	on_die = warden_on_died,
 })
 
+-- Spawn egg, for looking at the boss without hunting down a shrine. A
+-- sentinel spawned this way has no island_key or island_pos, which the
+-- code already allows for: do_custom only tethers when island_pos is set,
+-- sentinel_drops falls back to the default crystal, and warden_on_died
+-- returns early rather than marking some unrelated island cleared. So it
+-- flies and fights exactly as it does on a shrine, it simply does not
+-- guard anything. Note it is a boss - 220-260 HP, armor 140, 5 damage a
+-- hit - so spawn it somewhere you do not mind fighting.
+mobs:register_egg("lualore:mirror_sentinel", S("Mirror Sentinel"),
+	"amirror_sentinel.png", 0)
+
 -- ------------------------------------------------------------------
 -- Teleports
 -- ------------------------------------------------------------------
