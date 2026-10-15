@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "blockbench-animation": {
+      "source": "jasonjgardner/blockbench-mcp-project",
+      "sourceType": "github",
+      "skillPath": "skills/blockbench-animation/SKILL.md",
+      "computedHash": "6f70b5038a1ea415ff07876782408958d4a39b30c72718cf973ba14ade5a8ac7"
+    },
+    "blockbench-mcp-overview": {
+      "source": "jasonjgardner/blockbench-mcp-project",
+      "sourceType": "github",
+      "skillPath": "skills/blockbench-mcp-overview/SKILL.md",
+      "computedHash": "8fd41109f3a6d52fa1f6d567b2b43fb02d0bd329d2814a0a57f3105ca7504b7b"
+    },
+    "blockbench-modeling": {
+      "source": "jasonjgardner/blockbench-mcp-project",
+      "sourceType": "github",
+      "skillPath": "skills/blockbench-modeling/SKILL.md",
+      "computedHash": "d3377439f3bb524bcb9e285582a964a3aaa95c4a493c588f70c0ed8913a4b0dc"
+    },
+    "blockbench-texturing": {
+      "source": "jasonjgardner/blockbench-mcp-project",
+      "sourceType": "github",
+      "skillPath": "skills/blockbench-texturing/SKILL.md",
+      "computedHash": "399f2b4cd0e761ad365dd5cffe80b8d268d2c6372a4aeb4589356a028a2ad410"
+    },
+    "blockbench-use": {
+      "source": "jasonjgardner/blockbench-mcp-project",
+      "sourceType": "github",
+      "skillPath": "skills/blockbench-use/SKILL.md",
+      "computedHash": "35449353a5fa77f1fab39cd280d2af4fbbca6cfc3e1622cce04223e525280f06"
+    }
+  }
+}

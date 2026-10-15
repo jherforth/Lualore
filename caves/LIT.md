@@ -55,10 +55,35 @@ animation per clip, so the three clips are concatenated into a single
 timeline by `tools/combine_gltf_animations.py`:
 
 ```
-0.00 -  5.50  idle   (original "animation.standing.golbo")
-5.50 - 11.25  walk   (original "animation.walking.golbo")
-11.25 - 16.75  drill  (original "animation.mining.golbo")
+ 0.00 -  5.92  idle   (original "animation.standing.golbo")
+ 6.17 - 12.17  walk   (original "animation.walking.golbo")
+12.42 - 18.92  drill  (original "animation.mining.golbo")
 ```
+
+Take these numbers from what the tool prints. It does not simply append the
+clips, because doing that produced three faults that together were most of
+why the Lit looked mechanical:
+
+1. **One channel per bone.** glTF lets a bone be driven by at most one
+   channel per animation. Appending the clips gave `chest`, `torso` and
+   `leftUpperArm` three channels each and two more bones two, which is
+   invalid — the renderer picked a winner. Worse, a glTF sampler *clamps*
+   outside its own key range, so the legs (keyed only in the walk) held a
+   mid-stride pose through the whole idle and drill. Bones a clip does not
+   animate now hold their **rest** pose for that clip, which is what the clip
+   looks like in Blockbench.
+2. **A guard gap between clips** (`--gap`, default 0.25). Without it the
+   last frame of one clip is the first frame of the next, and whichever pose
+   lost showed for a frame every time its clip looped.
+3. **Closed loops and baked easing** (`--no-close-loops`, `--smooth N`). The
+   walk was six one-second strides cut off three-quarters of the way through
+   the sixth, so looping it jumped a quarter-stride — a lurch once per
+   cycle. Each clip now ends on the pose it began with. Easing is resampled
+   into denser `LINEAR` keys rather than written as `CUBICSPLINE`, because
+   Luanti reads `LINEAR` samplers.
+
+Verified after regenerating: 12 channels for 12 bones, no duplicate targets,
+every clip's loop seam under 0.1°, and leg travel through the idle exactly 0°.
 
 The mob plays these ranges with speed 1.0:
 
