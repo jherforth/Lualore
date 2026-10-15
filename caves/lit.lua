@@ -24,7 +24,7 @@
 	timeline and played through frame ranges (speed 1.0):
 	    0.00 -  5.92  idle   (original "animation.standing.golbo")
 	    6.17 - 12.17  walk   (original "animation.walking.golbo")
-	   12.42 - 18.92  drill  (original "animation.mining.golbo")
+	   12.42 - 13.63  drill  (original "animation.mining.golbo")
 	The combiner does three things the raw export does not, so take the
 	ranges above from what it prints rather than setting them by hand:
 	  * One channel per bone. glTF allows a bone to be driven once per
@@ -62,7 +62,7 @@ local BOLT = "lualore:lit_fire_bolt"
 local ANIM = {
 	idle = {0.0, 5.917},
 	walk = {6.167, 12.167},
-	mine = {12.417, 18.917},
+	mine = {12.417, 13.625},
 }
 -- Entities render meshes at 10 units per node, so the 20-unit model is
 -- 2.0 nodes tall at scale 1; 1.25 renders it at ~2.5 nodes tall
