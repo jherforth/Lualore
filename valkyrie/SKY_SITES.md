@@ -121,7 +121,10 @@ standing town:
 **Population.** A portal town is topped up to `lualore_portal_village_folk`
 Sky Folk (default 40) a few seconds after a player steps out of a portal
 there, once the town is active around them. The top-up runs at most once
-every two minutes per town. Newcomers are placed (`valkyrie/sky_town_folk.lua`):
+every 30 seconds per town, so a return trip always finds the town full.
+Each top-up also sets every Sky Folk in town to the state its castle's
+valkyrie chest shows: free if the chest is open and its fight won,
+captive while it is closed. Newcomers are placed (`valkyrie/sky_town_folk.lua`):
 - on open island ground with two nodes of headroom,
 - under open sky, so never inside a house or the castle,
 - with ground two nodes out on every side, so never on the rim,

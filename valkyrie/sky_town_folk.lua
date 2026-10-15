@@ -27,7 +27,8 @@ local TARGET = math.max(0, math.floor(tonumber(
 local COUNT_R = 64        -- Sky Folk this close to the middle count as residents
 local SPAWN_R = 44        -- newcomers arrive within this of the middle
 local SPAWN_MIN_R = 6     -- ...and not right on top of the castle door
-local REFILL_EVERY = 120  -- seconds between top-ups of one town
+local REFILL_EVERY = 30   -- seconds between top-ups of one town
+local CHEST_SEARCH = 80   -- how far from the middle a town's chest may stand
 local TOWN_REACH = 130    -- a portal town reaches this far (castle rock included)
 local HAMLET_REACH = 60
 
@@ -126,6 +127,47 @@ local function standing_spot(x, floor_y, z)
 	return nil
 end
 
+-- Is the town free? The castle's valkyrie chest decides: open and won
+-- means its valkyries are beaten; closed means they are not. The chest's
+-- position is found once and remembered on the town's record. A town with
+-- no chest found falls back to the record's own flag.
+local function town_freed(site)
+	local pos = site.chest_at
+	if pos then
+		local node = minetest.get_node_or_nil(pos)
+		if node and node.name ~= "lualore:valkyrie_chest"
+				and node.name ~= "lualore:valkyrie_chest_opened" then
+			pos = nil -- the chest is gone; look again
+			site.chest_at = nil
+		end
+	end
+	if not pos then
+		local found = minetest.find_nodes_in_area(
+			{x = site.x - CHEST_SEARCH, y = site.y - 10, z = site.z - CHEST_SEARCH},
+			{x = site.x + CHEST_SEARCH, y = site.y + 40, z = site.z + CHEST_SEARCH},
+			{"lualore:valkyrie_chest", "lualore:valkyrie_chest_opened"})
+		-- the town's own castle chest: the one nearest its middle
+		local best_d
+		for _, c in ipairs(found or {}) do
+			local d = math.hypot(c.x - site.x, c.z - site.z)
+			if not best_d or d < best_d then
+				pos, best_d = c, d
+			end
+		end
+		if pos then
+			site.chest_at = {x = pos.x, y = pos.y, z = pos.z}
+		end
+	end
+	if not pos then
+		return site.liberated == 1
+	end
+	local node = minetest.get_node_or_nil(pos)
+	local won = node and node.name == "lualore:valkyrie_chest_opened"
+		and minetest.get_meta(pos):get_int("won") == 1
+	site.liberated = won and 1 or nil
+	return won == true
+end
+
 -- Bring a town up to its full headcount. Returns how many arrived.
 function lualore.sky_town.populate(key)
 	local fb = builder()
@@ -147,6 +189,18 @@ function lualore.sky_town.populate(key)
 		end
 	end
 
+	-- Every Sky Folk in town takes the state its chest says: free if the
+	-- valkyries are beaten, captive while the chest is closed.
+	local freed = town_freed(site)
+	if freed and lualore.sky_liberation and lualore.sky_liberation.free then
+		for _, obj in ipairs(minetest.get_objects_inside_radius(centre, COUNT_R)) do
+			local ent = obj:get_luaentity()
+			if ent and ent.name == "lualore:sky_folk" and not ent.liberated then
+				lualore.sky_liberation.free(ent, true)
+			end
+		end
+	end
+
 	local want = TARGET - residents
 	local arrived, tries = 0, 0
 	while arrived < want and tries < want * 12 do
@@ -163,7 +217,7 @@ function lualore.sky_town.populate(key)
 			local ent = obj and obj:get_luaentity()
 			if ent then
 				arrived = arrived + 1
-				if site.liberated == 1 and lualore.sky_liberation
+				if freed and lualore.sky_liberation
 						and lualore.sky_liberation.free then
 					lualore.sky_liberation.free(ent, true)
 				end
