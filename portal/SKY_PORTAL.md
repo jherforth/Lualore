@@ -144,6 +144,39 @@ a trip that could only end in one fails with a message instead.
 The trip is a shortcut, not a way out of the world: the floatlands are open
 sky, and falling off an island means falling a long way.
 
+## 4b. The dark portal: to the wizard castles
+
+Wizard castles sit deep underground, between y -120 and -1200, and are hard
+to find. A **crystal on the roof** of a mese portal turns it into a way
+there:
+
+- Set any Everness crystal (`everness:crystal_purple`, `_orange` or
+  `_cyan`) on top of the frame's roof. A frame lit while wearing one burns
+  **black**, and so does an already-lit portal the moment the crystal is
+  placed. Taking the crystal off turns it blue again. Either way the
+  portal forgets its old link, since it now leads somewhere else.
+- **Where it leads:**
+  - The nearest recorded wizard castle within 1500 nodes
+    (`lualore_portal_castle_reach`).
+  - If there is none, it raises one in the caves below. It looks for a
+    cave floor a castle fits on in the 400 nodes under the castle band's
+    top, and if there's no such cave it digs the castle into the rock. It
+    is built by the normal castle builder: crypt, abandoned village, and
+    four wizards around the statue.
+- **Arrival:** you step out on open floor near the castle, through a dark
+  portal of its own, crowned with a crystal, linked back to the one you
+  came through. If the castle has no open floor, a landing is hollowed out
+  beside it.
+- **The wizards:** a castle whose wizards are all gone **gathers a new
+  group** a few seconds after someone arrives, at most once an hour per
+  castle. That way the trip is always a fight, without becoming a farm for
+  wizard drops.
+
+**Getting a crystal:** freed Sky Folk can offer the quest *The Shadow Gate*
+(6 obsidian, 2 mese crystals, 3 gold ingots). The reward is one crystal of
+a random colour, and its description says what to do with it. Crystals
+also grow in Everness's crystal forests.
+
 ## 5. Putting one out
 
 Digging any frame block puts the whole sheet out at once. Frames broken some

@@ -138,6 +138,10 @@ lualore_portal_village_houses (Sky portal village houses) int 18 6 30
 # unfreed town dangerous.
 lualore_portal_village_folk (Sky portal town population) int 40 0 120
 
+# A portal crowned with a crystal leads to the nearest wizard castle within
+# this many nodes, or raises a new one in the caves below if there is none.
+lualore_portal_castle_reach (Dark portal castle reach) int 1500 100 20000
+
 # Largest interior width or height the frame scan will accept. Frames have
 # no real size limit; this only stops the scan following an endless wall of
 # mese.

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Generate textures/lualore_sky_portal.png - the swirling sky portal sheet.
+"""Generate the swirling portal sheets: textures/lualore_sky_portal.png (blue,
+to the sky towns) and textures/lualore_dark_portal.png (black and violet, a
+portal crowned with a crystal, to the wizard castles).
 
 The texture is a vertical strip of 16x16 frames, played by the node's
 `vertical_frames` animation. Two properties matter more than the look:
@@ -42,6 +44,15 @@ PALETTE = [
     (138, 206, 255),
     (205, 240, 255),
 ]
+# the dark portal: near-black, with violet light moving in it
+DARK_PALETTE = [
+    (6, 4, 12),
+    (16, 8, 30),
+    (32, 14, 56),
+    (58, 22, 92),
+    (96, 40, 140),
+    (150, 80, 200),
+]
 # the deep bands are more see-through, the highlights nearly solid
 ALPHA_MIN, ALPHA_MAX = 140, 225
 
@@ -72,7 +83,7 @@ def field(u, v, t):
     return (s + 2.55) / 5.1   # roughly 0..1
 
 
-def main():
+def render(palette, alpha_min, alpha_max, filename):
     img = Image.new("RGBA", (SIZE, SIZE * FRAMES))
     px = img.load()
     for f in range(FRAMES):
@@ -81,15 +92,20 @@ def main():
             for x in range(SIZE):
                 k = max(0.0, min(0.999, field(x / SIZE, y / SIZE, t)))
                 band = int(k * BANDS)
-                r, g, b = PALETTE[band]
-                a = int(ALPHA_MIN + (ALPHA_MAX - ALPHA_MIN) * band / (BANDS - 1))
+                r, g, b = palette[band]
+                a = int(alpha_min + (alpha_max - alpha_min) * band / (BANDS - 1))
                 px[x, f * SIZE + y] = (r, g, b, a)
-
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       "..", "textures", "lualore_sky_portal.png")
+                       "..", "textures", filename)
     img.save(os.path.normpath(out))
     print("wrote %s (%dx%d, %d frames)" % (os.path.normpath(out),
                                           img.width, img.height, FRAMES))
+
+
+def main():
+    render(PALETTE, ALPHA_MIN, ALPHA_MAX, "lualore_sky_portal.png")
+    # the dark sheet is more opaque: you should not see what is beyond it
+    render(DARK_PALETTE, 200, 245, "lualore_dark_portal.png")
 
 
 if __name__ == "__main__":

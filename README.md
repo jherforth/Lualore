@@ -117,6 +117,8 @@ Build an upright rectangle of **mese blocks** — at least 2 wide and 3 tall ins
 - Break any frame block and the sheet goes out. Relight it with another ingot and it keeps its link.
 - Luanti has no separate dimensions, so the sky islands are the floatlands of the same world — the portal is a way up, not a way out. Mind the edges.
 
+**Dark portals.** Set a crystal on a portal's roof and it burns black. A dark portal leads down to the nearest **wizard castle**, raising one in the caves below if none is near, and the castle's wizards gather to meet you. Freed Sky Folk can trade you a crystal for the quest *The Shadow Gate*.
+
 **Mirror Sentinels** — hovering obelisk constructs that cast blinding curses — wander the sky islands. They drop mese, which is what the next portal frame is made of. `/sky_portals` lists the portals near you and where each one leads — see `portal/SKY_PORTAL.md` for the full guide.
 
 ### 🚪 Smart Doors

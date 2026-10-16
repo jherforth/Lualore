@@ -13,6 +13,23 @@ local sky_folk_sounds = {"skyfolk1", "skyfolk2", "skyfolk3", "skyfolk4"}
 
 local quest_pool = {
 	{
+		-- The way to the wizards' castles: a crystal set on a mese portal's
+		-- roof turns it black (portal/sky_portal.lua). It is offered by
+		-- freed Sky Folk because wizard castles are deep and hard to find.
+		name = "The Shadow Gate",
+		description = "Far below the world, the wizards keep their castles in the dark. Set this crystal on the roof of a mese portal and the portal will burn black and carry you down to them. Bring me what I ask and it is yours.",
+		required_items = {
+			{name = "default:obsidian",            count = 6},
+			{name = "default:mese_crystal",        count = 2},
+			{name = "default:gold_ingot",          count = 3},
+		},
+		reward_sets = {
+			{ {name = "everness:crystal_purple",   count = 1} },
+			{ {name = "everness:crystal_orange",   count = 1} },
+			{ {name = "everness:crystal_cyan",     count = 1} },
+		},
+	},
+	{
 		name = "The Wanderer's Debt",
 		description = "I have traveled far and lost my provisions. Bring me sustenance and I shall part with something precious.",
 		required_items = {

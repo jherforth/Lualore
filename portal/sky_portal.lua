@@ -56,6 +56,17 @@ local ENABLED = minetest.settings:get_bool("lualore_sky_portals", true)
 local FRAME = "default:mese"
 local IGNITER = "default:steel_ingot"
 local PORTAL = "lualore:sky_portal"
+-- A portal crowned with a crystal - any of Everness's three, set on the
+-- frame's roof - burns black and leads to a wizard castle instead.
+local DARK = "lualore:dark_portal"
+local CRYSTALS = {
+	["everness:crystal_purple"] = true,
+	["everness:crystal_orange"] = true,
+	["everness:crystal_cyan"] = true,
+}
+-- Go to a recorded wizard castle this close rather than raising a new one.
+local CASTLE_REACH = math.floor(tonumber(
+	minetest.settings:get("lualore_portal_castle_reach")) or 1500)
 
 local MIN_W, MIN_H = 2, 3
 
@@ -127,7 +138,7 @@ local SHEET = {
 	},
 }
 
-minetest.register_node(PORTAL, {
+local SHEET_DEF = {
 	description = S("Sky Portal"),
 	drawtype = "nodebox",
 	tiles = {SHEET, SHEET, SHEET, SHEET, SHEET, SHEET},
@@ -152,7 +163,21 @@ minetest.register_node(PORTAL, {
 	post_effect_color = {a = 150, r = 30, g = 80, b = 220},
 	groups = {not_in_creative_inventory = 1},
 	on_blast = function() end,
-})
+}
+minetest.register_node(PORTAL, SHEET_DEF)
+
+local DARK_SHEET = table.copy(SHEET)
+DARK_SHEET.name = "lualore_dark_portal.png"
+local DARK_DEF = table.copy(SHEET_DEF)
+DARK_DEF.description = S("Dark Portal")
+DARK_DEF.tiles = {DARK_SHEET, DARK_SHEET, DARK_SHEET, DARK_SHEET, DARK_SHEET, DARK_SHEET}
+DARK_DEF.light_source = 4
+DARK_DEF.post_effect_color = {a = 210, r = 12, g = 0, b = 28}
+minetest.register_node(DARK, DARK_DEF)
+
+local function is_sheet(name)
+	return name == PORTAL or name == DARK
+end
 
 lualore.sky_portal = {}
 
@@ -180,7 +205,7 @@ local function node_name(pos)
 end
 
 local function is_open(name)
-	return name == "air" or name == PORTAL
+	return name == "air" or is_sheet(name)
 end
 
 local function param2_of(axis)
@@ -302,9 +327,20 @@ local function interior(frame)
 	return out
 end
 
-local function light(frame)
+local function light(frame, dark)
 	minetest.bulk_set_node(interior(frame),
-		{name = PORTAL, param2 = param2_of(frame.axis)})
+		{name = dark and DARK or PORTAL, param2 = param2_of(frame.axis)})
+end
+
+-- Is there a crystal on the frame's roof?
+local function crowned(frame)
+	for i = -1, frame.w do
+		local p = cell(frame.anchor, frame.axis, i, frame.h + 1)
+		if CRYSTALS[node_name(p)] then
+			return true
+		end
+	end
+	return false
 end
 
 local function centre_of(frame)
@@ -314,7 +350,7 @@ end
 -- Put out every portal node connected to `pos`.
 local function collapse(pos)
 	local start = minetest.get_node(pos)
-	if start.name ~= PORTAL then
+	if not is_sheet(start.name) then
 		return
 	end
 	local axis = axis_of(start.param2)
@@ -326,7 +362,7 @@ local function collapse(pos)
 		local h = minetest.hash_node_position(p)
 		if not seen[h] then
 			seen[h] = true
-			if node_name(p) == PORTAL then
+			if node_name(p) == start.name then
 				found[#found + 1] = p
 				queue[#queue + 1] = {x = p.x + dx, y = p.y, z = p.z + dz}
 				queue[#queue + 1] = {x = p.x - dx, y = p.y, z = p.z - dz}
@@ -379,6 +415,9 @@ local function remember(frame)
 	rec.x, rec.y, rec.z = frame.anchor.x, frame.anchor.y, frame.anchor.z
 	rec.axis, rec.w, rec.h = frame.axis, frame.w, frame.h
 	rec.sky = frame.anchor.y >= SKY_Y
+	if frame.dark ~= nil then
+		rec.dark = frame.dark or nil
+	end
 	save_records()
 	return key, rec
 end
@@ -459,7 +498,8 @@ local function ignite(frame, obj, stack, player_name)
 		stack:take_item(1)
 		minetest.add_item(pos, stack)
 	end
-	light(frame)
+	frame.dark = crowned(frame)
+	light(frame, frame.dark)
 	local key = remember(frame)
 	swirl(frame, 40 + frame.w * frame.h)
 	minetest.sound_play("fire_flint_and_steel",
@@ -670,7 +710,14 @@ local function build(frame)
 		end
 	end
 	minetest.bulk_set_node(mese, {name = FRAME})
-	light(frame)
+	light(frame, frame.dark)
+	if frame.dark then
+		-- the castle end wears its crystal too
+		local top = cell(frame.anchor, frame.axis, math.floor((frame.w - 1) / 2), frame.h + 1)
+		if node_name(top) == "air" then
+			minetest.set_node(top, {name = "everness:crystal_purple"})
+		end
+	end
 end
 
 -- ------------------------------------------------------------------
@@ -949,6 +996,89 @@ local function ensure_castle(fb, key, site, done)
 end
 
 -- ------------------------------------------------------------------
+-- Wizard castles (the dark portal)
+-- ------------------------------------------------------------------
+local to_castle
+
+local function nearest_castle(cc, near)
+	local best, best_key, best_d
+	for key, castle in pairs(cc.get_records()) do
+		if type(castle) == "table" and castle.x and castle.z then
+			local d = math.hypot(castle.x - near.x, castle.z - near.z)
+			if d <= CASTLE_REACH and (not best_d or d < best_d) then
+				best, best_key, best_d = castle, key, d
+			end
+		end
+	end
+	return best_key, best
+end
+
+-- Raise a wizard castle in the caves below `column`: on the first cave
+-- floor big enough for one, or dug into the rock if there is none.
+local function found_castle(cc, column, done)
+	local band = cc.band or {top = -120, bottom = -1200}
+	local top = band.top
+	local bottom = math.max(band.bottom, top - 400)
+	local plaza = (cc.get_geometry and cc.get_geometry().plaza) or 7
+	local r = 48
+	local function place(x, floor_y, z)
+		local center = {x = x, y = floor_y - plaza, z = z}
+		local rot = ({0, 90, 180, 270})[math.random(1, 4)]
+		if not lualore.place_cave_castle(center, rot, {source = "dark portal"}) then
+			return done(nil)
+		end
+		local key = cc.key_of(center)
+		return done(key, cc.get_records()[key])
+	end
+	emerge_then({x = column.x - r, y = bottom, z = column.z - r},
+		{x = column.x + r, y = top + 40, z = column.z + r}, function()
+			for _, off in ipairs({{0, 0}, {24, 0}, {-24, 0}, {0, 24}, {0, -24}}) do
+				local floor_y = cc.find_floor(column.x + off[1], column.z + off[2], top, bottom)
+				if floor_y then
+					return place(column.x + off[1], floor_y, column.z + off[2])
+				end
+			end
+			return place(column.x, top - 80, column.z) -- no cave: dig it in
+		end)
+end
+
+-- Where a dark portal leads: the nearest wizard castle, or a new one.
+-- The far end is a dark portal of its own, crowned, at the castle.
+to_castle = function(column, ctx, settle, done)
+	local cc = lualore.cave_castle
+	if not (cc and cc.get_records and cc.find_floor and lualore.place_cave_castle) then
+		return done(nil)
+	end
+	local plaza = (cc.get_geometry and cc.get_geometry().plaza) or 7
+	local function land(castle_key, castle)
+		if not castle then
+			return done(nil)
+		end
+		local floor = castle.y + plaza
+		local target = {x = castle.x, y = floor, z = castle.z}
+		search(target, true, true, ctx.name, function(frame, minp, maxp)
+			if not frame then
+				-- no open floor about the castle: hollow out a landing beside it
+				local b = cc.castle_bounds and cc.castle_bounds(
+					{x = castle.x, y = castle.y, z = castle.z}, castle.rot)
+				local side = {x = (b and b.maxx or castle.x + 20) + 6, y = floor, z = castle.z}
+				frame = platform_at(side, true, minp, maxp)
+			end
+			frame.dark = true
+			return settle(frame, nil, castle_key)
+		end)
+	end
+	local castle_key, castle = nearest_castle(cc, column)
+	if castle then
+		return land(castle_key, castle)
+	end
+	if ctx.say then
+		ctx.say(S("Far below, something old stirs in the rock..."))
+	end
+	found_castle(cc, column, land)
+end
+
+-- ------------------------------------------------------------------
 -- Resolving a destination
 -- ------------------------------------------------------------------
 -- Every failed check below forgets a record before retrying, so this
@@ -977,7 +1107,7 @@ local function resolve(key, ctx, done, depth)
 			end
 			local frame = scan_frame(anchor, dest.axis)
 			if frame and frame.w == dest.w and frame.h == dest.h then
-				light(frame) -- relight it in case it was put out and repaired
+				light(frame, dest.dark) -- relight it in case it was put out and repaired
 				-- A village portal's town must have its castle. Checked on
 				-- every trip in, not just the first: portals linked to a
 				-- town built before every town had one would otherwise
@@ -1005,10 +1135,11 @@ local function resolve(key, ctx, done, depth)
 	local column = {x = math.floor(here.x + 0.5), z = math.floor(here.z + 0.5),
 		y = going_up and SKY_AIM or 0}
 
-	local function settle(frame, village)
+	local function settle(frame, village, castle_key)
 		build(frame)
 		local dest_key, dest = remember(frame)
 		dest.village = village or nil
+		dest.castle = castle_key
 		link(key, dest_key)
 		minetest.log("action", "[lualore] Sky portal " .. key ..
 			" linked to new portal " .. dest_key ..
@@ -1044,6 +1175,10 @@ local function resolve(key, ctx, done, depth)
 					return fall_back_to_column()
 				end)
 		end)
+	end
+
+	if rec.dark then
+		return to_castle(column, ctx, settle, done)
 	end
 
 	if not going_up then
@@ -1088,7 +1223,17 @@ local function arrive(player, dest_key)
 	swirl(frame, 30)
 	minetest.sound_play("magic",
 		{pos = centre_of(frame), gain = 0.8, max_hear_distance = 20}, true)
-	if dest.village then
+	if dest.castle then
+		minetest.chat_send_player(player:get_player_name(),
+			S("You step out beneath the earth, into the wizards' domain."))
+		-- an emptied castle gathers its wizards again (once an hour at most)
+		local cc = lualore.cave_castle
+		if cc and cc.regather then
+			minetest.after(5, function()
+				cc.regather(cc.get_records()[dest.castle])
+			end)
+		end
+	elseif dest.village then
 		minetest.chat_send_player(player:get_player_name(),
 			S("You step out into a sky village. Mind the edge."))
 		-- Fill the town up to its headcount. Wait a few seconds first: the
@@ -1114,20 +1259,67 @@ local function still_at(player, frame)
 		and math.hypot(p.x - c.x, p.z - c.z) <= frame.w / 2 + 1.5
 end
 
+-- A crystal set on (or taken off) a lit portal's roof turns the sheet
+-- black (or blue) at once. It now leads somewhere else, so this end forgets
+-- its link and finds its new far end on the next trip.
+local function sync_crown(frame, node)
+	local dark = crowned(frame)
+	if dark == (node.name == DARK) then
+		return false
+	end
+	frame.dark = dark
+	light(frame, dark)
+	local _, rec = remember(frame)
+	rec.link = nil
+	save_records()
+	swirl(frame, 20 + frame.w * frame.h)
+	return true
+end
+
+local function recrown_near(pos)
+	-- the sheet is two below the crystal, or diagonally so if the crystal
+	-- sits over a wall or corner
+	for dx = -1, 1 do
+		for dz = -1, 1 do
+			local p = {x = pos.x + dx, y = pos.y - 2, z = pos.z + dz}
+			local node = minetest.get_node(p)
+			if is_sheet(node.name) then
+				local frame = scan_frame(p, axis_of(node.param2))
+				if frame then
+					sync_crown(frame, node)
+				end
+				return
+			end
+		end
+	end
+end
+
+minetest.register_on_placenode(function(pos, newnode)
+	if CRYSTALS[newnode.name] then
+		recrown_near(pos)
+	end
+end)
+
 local function depart(player, portal_pos)
 	local name = player:get_player_name()
 	local t = traveller(name)
 	local node = minetest.get_node(portal_pos)
-	local frame = node.name == PORTAL
+	local frame = is_sheet(node.name)
 		and scan_frame(portal_pos, axis_of(node.param2))
 	if not frame then
 		t.must_leave = true
 		return
 	end
+	-- crowned or uncrowned since it was lit, by something that did not
+	-- tell us (WorldEdit, another mod): catch up now
+	sync_crown(frame, node)
+	frame.dark = crowned(frame)
 	local key = remember(frame)
 	t.busy = true
 	if not records[key].link then
-		minetest.chat_send_player(name, records[key].sky
+		minetest.chat_send_player(name, records[key].dark
+			and S("The dark portal reaches down into the deep...")
+			or records[key].sky
 			and S("The portal reaches down toward the ground...")
 			or S("The portal reaches up toward the sky islands..."))
 	end
@@ -1158,11 +1350,11 @@ end
 local function portal_under(player)
 	local p = player:get_pos()
 	local feet = vector.round({x = p.x, y = p.y + 0.1, z = p.z})
-	if node_name(feet) == PORTAL then
+	if is_sheet(node_name(feet)) then
 		return feet
 	end
 	local head = {x = feet.x, y = feet.y + 1, z = feet.z}
-	if node_name(head) == PORTAL then
+	if is_sheet(node_name(head)) then
 		return head
 	end
 	return nil
@@ -1197,12 +1389,16 @@ local DIRS = {
 
 -- Taking a frame block out puts the sheet out at once.
 minetest.register_on_dignode(function(pos, oldnode)
+	if CRYSTALS[oldnode.name] then
+		recrown_near(pos) -- the crown came off: the sheet turns blue again
+		return
+	end
 	if oldnode.name ~= FRAME then
 		return
 	end
 	for _, d in ipairs(DIRS) do
 		local p = vector.add(pos, d)
-		if node_name(p) == PORTAL then
+		if is_sheet(node_name(p)) then
 			collapse(p)
 		end
 	end
@@ -1213,7 +1409,7 @@ end)
 -- its frame.
 minetest.register_abm({
 	label = "Lualore sky portal frame check",
-	nodenames = {PORTAL},
+	nodenames = {PORTAL, DARK},
 	interval = 7,
 	chance = 1,
 	catch_up = false,
@@ -1222,7 +1418,7 @@ minetest.register_abm({
 		for _, d in ipairs({{dx, 0, dz}, {-dx, 0, -dz}, {0, 1, 0}, {0, -1, 0}}) do
 			local name = node_name({x = pos.x + d[1], y = pos.y + d[2],
 				z = pos.z + d[3]})
-			if name ~= PORTAL and name ~= FRAME then
+			if not is_sheet(name) and name ~= FRAME then
 				collapse(pos)
 				return
 			end
@@ -1283,7 +1479,7 @@ minetest.register_chatcommand("sky_portals", {
 				local dest = rec.link and records[rec.link]
 				lines[#lines + 1] = string.format(
 					"%s portal %dx%d at (%d,%d,%d), %d m away - %s",
-					rec.sky and "Sky" or "Ground", rec.w, rec.h,
+					rec.dark and "Dark" or rec.sky and "Sky" or "Ground", rec.w, rec.h,
 					rec.x, rec.y, rec.z, math.floor(d),
 					dest and string.format("leads to (%d,%d,%d)",
 						dest.x, dest.y, dest.z) or "not linked yet")

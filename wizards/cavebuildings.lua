@@ -746,13 +746,60 @@ local function place_castle(center, rot, opts)
 end
 lualore.place_cave_castle = place_castle
 
--- Shared helpers (used by castle_village.lua and debugging commands).
+-- A castle whose wizards are all gone gathers a new group when someone
+-- arrives, but no more than once in this many seconds, so a castle is a
+-- fight worth travelling to rather than a wizard farm.
+local REGATHER_EVERY = 3600
+
+local WIZARD_SET = {}
+for _, colour in ipairs({"red", "white", "gold", "black"}) do
+	WIZARD_SET["lualore:" .. colour .. "wizard"] = true
+end
+
+local function regather(record)
+	if not record then
+		return 0
+	end
+	local center = {x = record.x, y = record.y, z = record.z}
+	local statue = find_statue(center, record.rot)
+	if not statue then
+		return 0
+	end
+	for _, obj in ipairs(minetest.get_objects_inside_radius(statue, 48)) do
+		local ent = obj:get_luaentity()
+		if ent and WIZARD_SET[ent.name] then
+			return 0 -- the wizards are still here
+		end
+	end
+	local now = os.time()
+	if record.regather_at and now - record.regather_at < REGATHER_EVERY
+			and (record.wizards or 0) >= 4 then
+		return 0
+	end
+	record.regather_at = now
+	local spawned = spawn_wizards_around_statue(statue, {})
+	record.wizards = 4
+	save_castles()
+	minetest.log("action", "[lualore] Wizards gathered again at cave castle " ..
+		minetest.pos_to_string(center) .. " (" .. tostring(spawned) .. ")")
+	return spawned
+end
+
+-- Shared helpers (used by castle_village.lua, the dark portal and
+-- debugging commands).
 lualore.cave_castle = {
 	get_geometry = get_geometry,
 	castle_bounds = castle_bounds,
 	get_records = function()
 		load_castles()
 		return castles
+	end,
+	-- A cave floor a castle fits on in column (x, z), or nil, reason.
+	find_floor = find_castle_floor,
+	band = {top = Y_TOP, bottom = Y_BOTTOM},
+	regather = regather,
+	key_of = function(center)
+		return minetest.pos_to_string(center)
 	end,
 }
 
