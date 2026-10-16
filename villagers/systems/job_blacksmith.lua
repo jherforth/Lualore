@@ -114,7 +114,7 @@ smith.on_interact = function(self, player)
 	return lualore.jobs.share_interact(self, player, {
 		empty = S("The smith wipes his hands. \"Nothing finished yet. Come back when the fire's been up a while.\""),
 		already = S("The smith shakes his head. \"You've had what I can spare today.\""),
-		gave = S("The smith hands you @1."),
+		gave = function(items) return S("The smith hands you @1.", items) end,
 		withheld = S("He sets the rest aside - the village keeps its own in stock."),
 	})
 end

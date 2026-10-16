@@ -116,7 +116,7 @@ fisher.on_interact = function(self, player)
 	return lualore.jobs.share_interact(self, player, {
 		empty = S("The fisherman shrugs at his empty trap. \"Nothing's run into it yet.\""),
 		already = S("The fisherman shakes his head. \"You've had today's catch.\""),
-		gave = S("The fisherman hands you @1."),
+		gave = function(items) return S("The fisherman hands you @1.", items) end,
 		withheld = S("He keeps the rest for the village pot."),
 	})
 end

@@ -95,7 +95,7 @@ jeweler.on_interact = function(self, player)
 	return lualore.jobs.share_interact(self, player, {
 		empty = S("The jeweler holds up an empty hand. \"Nothing finished. These things take patience.\""),
 		already = S("The jeweler smiles thinly. \"You have had a piece from me today.\""),
-		gave = S("The jeweler parts with @1."),
+		gave = function(items) return S("The jeweler parts with @1.", items) end,
 		withheld = S("The rest stays in the case - you are not that well known here."),
 	})
 end

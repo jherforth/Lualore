@@ -697,8 +697,9 @@ function lualore.jobs.share_interact(self, player, lines)
 		return true
 	end
 
-	minetest.chat_send_player(player_name,
-		lines.gave:gsub("@1", table.concat(parts, ", ")))
+	-- `gave` takes the list and translates with it: a template translated
+	-- with its @1 still empty is an error in current Luanti, not a warning.
+	minetest.chat_send_player(player_name, lines.gave(table.concat(parts, ", ")))
 	if lines.withheld and share < 1 and lualore.jobs.stock_count(self) > 0 then
 		minetest.chat_send_player(player_name, lines.withheld)
 	end
