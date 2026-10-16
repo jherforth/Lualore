@@ -221,7 +221,7 @@ end
 
 -- A tilled plot: soil everywhere, water in the middle to keep it wet,
 -- the stake on a corner, and a crop on every soil column.
-local function place_farm(site, map, pr)
+local function place_farm(site, map, pr, r_min, r_max)
 	local soil = minetest.registered_nodes["farming:soil_wet"] and "farming:soil_wet"
 	local crop = minetest.registered_nodes["farming:wheat_1"] and "farming:wheat_1"
 	local stake_ok = minetest.registered_nodes["lualore:field_stake"] ~= nil
@@ -229,7 +229,7 @@ local function place_farm(site, map, pr)
 		return 0
 	end
 
-	local x, y, z = find_spot(site, map, PLOT_HALF, 12, 26, pr, 2)
+	local x, y, z = find_spot(site, map, PLOT_HALF, r_min or 12, r_max or 26, pr, 2)
 	if not x then
 		return 0
 	end
@@ -271,6 +271,53 @@ local function place_farm(site, map, pr)
 	return 1, stake_pos
 end
 
+-- The village notice board, where houses are commissioned
+-- (village_commissions.lua). One per village, near the middle.
+local BOARD = "lualore:notice_board"
+
+local function place_board(site, map, pr)
+	if not minetest.registered_nodes[BOARD] then
+		return 0
+	end
+	local r = site.radius or 34
+	if #minetest.find_nodes_in_area(
+			{x = site.cx - r, y = site.floor_y - 6, z = site.cz - r},
+			{x = site.cx + r, y = site.floor_y + 10, z = site.cz + r}, {BOARD}) > 0 then
+		return 0 -- already has one
+	end
+	local x, y, z = find_spot(site, map, 0, 3, 10, pr, 1)
+	if not x then
+		return 0
+	end
+	local pos = {x = x, y = y + 1, z = z}
+	-- face the middle of the village
+	local dir = {x = site.cx - x, y = 0, z = site.cz - z}
+	local param2 = (dir.x ~= 0 or dir.z ~= 0) and minetest.dir_to_facedir(dir) or 0
+	minetest.set_node(pos, {name = BOARD, param2 = param2})
+	return 1, pos
+end
+
+-- A single station node near (cx, cz): for trades with no placer of their
+-- own.
+local function place_single(site, map, pr, node)
+	if not (node and minetest.registered_nodes[node]) then
+		return 0
+	end
+	local x, y, z = find_spot(site, map, 0, 3, 10, pr, 1)
+	if not x then
+		return 0
+	end
+	minetest.set_node({x = x, y = y + 1, z = z}, {name = node})
+	return 1, {x = x, y = y + 1, z = z}
+end
+
+-- Workstations for the trades without a placer above, by palette where the
+-- prop is biome-specific.
+local ENTERTAINER_PROP = {
+	desert = "lualore:desertcrpet", jungle = "lualore:jungleshrine",
+	savanna = "lualore:savannavshrine", ice = "lualore:sledge",
+}
+
 -- ------------------------------------------------------------------
 -- Public entry point
 -- ------------------------------------------------------------------
@@ -298,6 +345,10 @@ function lualore.workstations.furnish(site)
 	placed = placed + (n or 0)
 	results.forge = pos
 
+	n, pos = place_board(site, map, pr)
+	placed = placed + (n or 0)
+	results.board = pos
+
 	local palette_name = site.palette and site.palette.name
 	if not (palette_name and NO_FARM[palette_name]) then
 		local farms = 1 + ((site.seed or 0) % 3 == 0 and 1 or 0)
@@ -313,13 +364,43 @@ function lualore.workstations.furnish(site)
 	return placed, results
 end
 
+-- A workstation for one trade, close to (site.cx, site.cz): the house a
+-- commissioned newcomer moves into. Villagers claim a station within 20
+-- nodes of their bed, so it is kept within about 14 of the house's middle.
+-- Returns the number of nodes placed and the station's position.
+function lualore.workstations.place_for(site, class)
+	local map = column_map(site)
+	if next(map) == nil then
+		return 0
+	end
+	local pr = PcgRandom((site.seed or 1) + 7919)
+	if class == "blacksmith" then
+		return place_forge(site, map, pr)
+	elseif class == "cleric" then
+		return place_altar(site, map, pr)
+	elseif class == "farmer" then
+		return place_farm(site, map, pr, 7, 14)
+	elseif class == "fisherman" then
+		return place_single(site, map, pr, "lualore:fishtrap")
+	elseif class == "jeweler" then
+		local shelf = minetest.registered_nodes["vessels:shelf"] and "vessels:shelf"
+			or "lualore:grasslandbarrel"
+		return place_single(site, map, pr, shelf)
+	elseif class == "entertainer" then
+		local palette_name = site.palette and site.palette.name
+		return place_single(site, map, pr,
+			ENTERTAINER_PROP[palette_name] or "lualore:hookah")
+	end
+	return 0 -- the ranger needs no station
+end
+
 -- ------------------------------------------------------------------
 -- Retrofit command
 -- ------------------------------------------------------------------
 minetest.register_chatcommand("furnish_village", {
 	params = "[radius]",
 	description = S("Add the missing workstations (anvil, forge, altar, " ..
-		"farm plots) to the village you are standing in."),
+		"farm plots) and the notice board to the village you are standing in."),
 	privs = {server = true},
 	func = function(name, param)
 		local player = minetest.get_player_by_name(name)

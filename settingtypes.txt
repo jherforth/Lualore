@@ -204,3 +204,17 @@ lualore_village_workstations (Village workstations) bool true
 # villagers make earns it, and better standing means a larger share of
 # what they produce. Earn-only: nothing you do can lower it.
 lualore_village_standing (Village standing) bool true
+
+# -------------------------------------------------------------------
+# Village commissions (see villagers/VILLAGE_EXPANSION.md)
+# -------------------------------------------------------------------
+
+# Players commission new houses at a village's notice board, deliver the
+# materials, and a newcomer of the trade they chose moves in.
+lualore_village_commissions (Village commissions) bool true
+
+# Most houses one village can be given by commission.
+lualore_village_max_commissions (Commissioned houses per village) int 8 0 30
+
+# How much more each commission costs than the last (0.25 = 25% more).
+lualore_commission_cost (Commission cost growth) float 0.25 0.0 2.0

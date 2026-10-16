@@ -44,6 +44,7 @@ local EARN = {
 	trade = 2,     -- completed a trade
 	job = 1,       -- used what a villager makes
 	show = 1,      -- watched an entertainer perform
+	commission = 2, -- delivered materials for a new house
 }
 
 -- ------------------------------------------------------------------

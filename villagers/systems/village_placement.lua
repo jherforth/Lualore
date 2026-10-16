@@ -1029,6 +1029,19 @@ lualore.villages = {
 	end,
 	get_palettes = get_palettes,
 
+	-- Change a village record in place and save it: fn(record) edits it.
+	-- The commissions system uses this to count the houses it adds.
+	update = function(key, fn)
+		local records = load_records()
+		local rec = records[key]
+		if type(rec) ~= "table" then
+			return false
+		end
+		fn(rec)
+		storage:set_string("villages", minetest.serialize(records))
+		return true
+	end,
+
 	-- Nearest recorded village to a position, or nil. Returns the record
 	-- plus the key it is stored under - the village standing system keys
 	-- a player's reputation by exactly that string, so it has to be the

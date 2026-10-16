@@ -88,6 +88,10 @@ Villages remember you. Feeding, trading and using what villagers make builds **s
 a village that knows you shares more of what it makes. It can only go up. See
 `villagers/VILLAGER_JOBS.md`.
 
+### 🏡 Growing a Village
+
+Every village has a **notice board**. Earn a village's trust and you can commission a new house there and choose who will live in it — a farmer, a smith, a cleric, a fisherman, a jeweler, an entertainer or a ranger. The village picks a plot on its edge and posts a bill of materials drawn from the very house it means to build: thatch and stone for a grassland cottage, sandstone for a desert one. Anyone can chip in. Once it is all delivered the house rises layer by layer on scaffolding, and when it is finished the newcomer walks in from the road, thanks you by name, and starts work at a workstation built beside their new home. Each house costs more than the last and needs a closer bond with the village, up to eight per village. See `villagers/VILLAGE_EXPANSION.md`.
+
 ### 🏗️ Village Buildings
 
 Each biome has unique structures: houses, churches, markets, stables and more. A village plan is computed first (flat ground, no overlapping footprints) and only then placed, so buildings always form a clean hamlet instead of scattering or overwriting each other.

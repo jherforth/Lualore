@@ -96,6 +96,8 @@ dofile(modpath .. "/wizards/wizard_wands.lua")
 dofile(modpath .. "/villagers/systems/villagers.lua")
 dofile(modpath .. "/villagers/systems/house_spawning.lua")
 dofile(modpath .. "/villagers/systems/village_standing.lua")
+-- growing a village: commissions at the notice board
+dofile(modpath .. "/villagers/systems/village_commissions.lua")
 dofile(modpath .. "/villagers/systems/village_commands.lua")
 dofile(modpath .. "/wizards/cave_wizards.lua")
 

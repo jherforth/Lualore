@@ -111,7 +111,15 @@ local function draw_class(bed_pos)
     return table.remove(deck)
 end
 
-lualore.villager_deck = {draw = draw_class, tiers = class_tiers}
+-- A bed reserved for a trade (a commissioned house, village_commissions.lua)
+-- is always settled, by that trade: no empty-bed roll, no draw from the deck.
+local reserved = {} -- bed pos string -> class
+
+local function reserve(bed_pos, class)
+    reserved[minetest.pos_to_string(vector.round(bed_pos))] = class
+end
+
+lualore.villager_deck = {draw = draw_class, tiers = class_tiers, reserve = reserve}
 
 -- Marker node -> biome. Defined once in villagers/blocks/aliases.lua,
 -- which also maps the legacy nativevillages: names the schematics store.
@@ -224,11 +232,20 @@ function lualore.house_spawning.populate(search_min, search_max)
                 bed_pairs[bed_pair_key] = true
             end
 
+            local reserved_class = reserved[bed_key]
+                or (partner_key and reserved[partner_key])
+            if reserved_class then
+                reserved[bed_key] = nil
+                if partner_key then
+                    reserved[partner_key] = nil
+                end
+            end
+
             -- 28% chance the bed is unoccupied (adds realism). Recorded
             -- as "empty" rather than just skipped: the roll has to stand,
             -- or the next pass over this ground would roll it again and
             -- the village would slowly fill up to every bed occupied.
-            if math.random() < 0.28 then
+            if not reserved_class and math.random() < 0.28 then
                 settle("empty")
                 goto continue
             end
@@ -276,7 +293,7 @@ function lualore.house_spawning.populate(search_min, search_max)
             local spawn_pos = find_spawn_spot(bed_pos)
 
             -- Spawn the villager
-            local class = draw_class(bed_pos)
+            local class = reserved_class or draw_class(bed_pos)
             local mob_name = "lualore:" .. biome .. "_" .. class
 
             local obj = minetest.add_entity(spawn_pos, mob_name)
