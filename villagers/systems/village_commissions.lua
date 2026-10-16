@@ -49,6 +49,8 @@ local SEARCH_MIN, SEARCH_MAX = 14, 90 -- plot search rings around the village
 local MARGIN = 3            -- open ground kept round a new house
 local LEVEL_SLACK = 2       -- plot ground may be this far off the village floor
 local SCAFFOLD = "default:fence_wood"
+local INVITE_STANDING = 10  -- standing needed to invite a settler into an empty bed
+local VILLAGE_REACH = 96    -- how far from its middle a village's beds may be
 
 -- Trades a newcomer can have, in the order the board lists them.
 local TRADES = {"farmer", "blacksmith", "cleric", "fisherman", "jeweler",
@@ -678,6 +680,90 @@ local function trades_for(rec, palette)
 	return out
 end
 
+-- Empty beds belonging to this village (nearest the board first).
+local function free_beds(rec, key, near)
+	local hs = lualore.house_spawning
+	if not (hs and hs.free_beds) then
+		return {}
+	end
+	local found = hs.free_beds(
+		{x = rec.x - VILLAGE_REACH, y = rec.y - 16, z = rec.z - VILLAGE_REACH},
+		{x = rec.x + VILLAGE_REACH, y = rec.y + 24, z = rec.z + VILLAGE_REACH})
+	local out = {}
+	for _, bed in ipairs(found) do
+		local _, bed_village = village_of(bed)
+		if bed_village == key then
+			out[#out + 1] = bed
+		end
+	end
+	near = near or rec
+	table.sort(out, function(a, b)
+		return vector.distance(a, near) < vector.distance(b, near)
+	end)
+	return out
+end
+
+lualore.commissions.free_beds = free_beds
+
+-- Is there a workstation for `class` within reach of a bed?
+local function station_near(class, bed)
+	local def = lualore.jobs and lualore.jobs.classes and lualore.jobs.classes[class]
+	if not def or not def.stations or #def.stations == 0 then
+		return true -- trades that need none
+	end
+	return #minetest.find_nodes_in_area(vector.subtract(bed, {x = 20, y = 8, z = 20}),
+		vector.add(bed, {x = 20, y = 8, z = 20}), def.stations) > 0
+end
+
+-- Invite a settler of `class` into one of the village's empty beds.
+-- Returns true or false, message.
+function lualore.commissions.invite(player, board_pos, class)
+	local name = player:get_player_name()
+	local rec, key = village_of(board_pos)
+	if not rec then
+		return false, S("This board does not belong to a village.")
+	end
+	local have = lualore.standing and lualore.standing.get(name, board_pos) or 100
+	if have < INVITE_STANDING then
+		return false, S("The village does not know you well enough to take your " ..
+			"word for a stranger yet.")
+	end
+	local bed = free_beds(rec, key, board_pos)[1]
+	if not bed then
+		return false, S("Every bed in the village is taken.")
+	end
+	local hs = lualore.house_spawning
+	local spawned = hs.settle_bed(bed, class)
+	if spawned < 1 then
+		return false, S("Nobody answered the invitation.")
+	end
+	-- they come in along the road, like any newcomer
+	for _, obj in ipairs(minetest.get_objects_inside_radius(bed, 12)) do
+		local ent = obj:get_luaentity()
+		if ent and ent.nv_house_pos and vector.equals(vector.round(ent.nv_house_pos),
+				vector.round(bed)) then
+			local spot = arrival_spot(rec, bed)
+			if spot then
+				obj:set_pos(spot)
+			end
+			break
+		end
+	end
+	if not station_near(class, bed) and lualore.workstations
+			and lualore.workstations.place_for then
+		lualore.workstations.place_for({
+			cx = bed.x, cz = bed.z, floor_y = rec.y, radius = 22,
+			seed = bed.x * 31 + bed.z, palette = palette_of(rec),
+		}, class)
+	end
+	minetest.chat_send_player(name, minetest.colorize("#FFDD88",
+		S("A @1 has taken up your invitation and is on the road to the village.",
+			title_of(class))))
+	minetest.log("action", "[lualore] " .. name .. " invited a " .. class ..
+		" into an empty bed at " .. minetest.pos_to_string(bed))
+	return true
+end
+
 -- Start a commission. Returns true or false, message.
 function lualore.commissions.open(player, board_pos, class)
 	local name = player:get_player_name()
@@ -687,6 +773,9 @@ function lualore.commissions.open(player, board_pos, class)
 	end
 	if commissions[key] then
 		return false, S("This village already has a house in hand.")
+	end
+	if #free_beds(rec, key) > 0 then
+		return false, S("There are empty beds in the village - invite a settler instead.")
 	end
 	local done = rec.commissioned or 0
 	if done >= MAX_COMMISSIONS then
@@ -796,6 +885,19 @@ local function form(player, board_pos)
 		tier.name, value, done, MAX_COMMISSIONS)) .. "]"
 
 	local c = commissions[key]
+	local empty = not c and free_beds(rec, key, board_pos) or {}
+	if #empty > 0 then
+		fs[#fs + 1] = "label[0.4,1.8;" .. F(S("@1 empty bed(s) in the village. Invite a settler:",
+			#empty)) .. "]"
+		fs[#fs + 1] = "label[0.4,2.3;" .. F(S("(Needs @1 standing. No materials needed " ..
+			"while there are beds to fill.)", INVITE_STANDING)) .. "]"
+		for i, class in ipairs(trades_for(rec, palette_of(rec))) do
+			local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+			fs[#fs + 1] = string.format("button[%.1f,%.1f;4.4,0.8;invite_%s;%s]",
+				0.4 + col * 4.8, 2.9 + row * 1.0, class, F(S("A @1", title_of(class))))
+		end
+		return table.concat(fs)
+	end
 	if not c then
 		if done >= MAX_COMMISSIONS then
 			fs[#fs + 1] = "label[0.4,2;" .. F(S("This village has grown as large as it will.")) .. "]"
@@ -877,6 +979,13 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		local class = field:match("^trade_(.+)$")
 		if class then
 			local ok, msg = lualore.commissions.open(player, pos, class)
+			if not ok and msg then
+				minetest.chat_send_player(name, msg)
+			end
+		end
+		local guest = field:match("^invite_(.+)$")
+		if guest then
+			local ok, msg = lualore.commissions.invite(player, pos, guest)
 			if not ok and msg then
 				minetest.chat_send_player(name, msg)
 			end

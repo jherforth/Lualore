@@ -133,6 +133,68 @@ local marker_list = lualore.village_marker_list
 local storage = minetest.get_mod_storage()
 
 local function load_beds()
+
+local function save_beds()
+    storage:set_string("beds_with_villagers", minetest.serialize(beds_with_villagers))
+end
+
+-- The two halves of a bed: the key of this one and of its partner, if any.
+local function bed_keys(bed_pos)
+    local keys = {minetest.pos_to_string(vector.round(bed_pos))}
+    for _, offset in ipairs({{x=1,y=0,z=0}, {x=-1,y=0,z=0}, {x=0,y=0,z=1}, {x=0,y=0,z=-1}}) do
+        local p = vector.add(vector.round(bed_pos), offset)
+        if minetest.get_item_group(minetest.get_node(p).name, "bed") > 0 then
+            keys[2] = minetest.pos_to_string(p)
+            break
+        end
+    end
+    return keys
+end
+
+-- A bed whose villager has died is "vacant": not refilled automatically,
+-- so a death is not silently undone, but offered at the village notice
+-- board for a player to invite a settler into (village_commissions.lua).
+function lualore.house_spawning.vacate(bed_pos)
+    for _, k in ipairs(bed_keys(bed_pos)) do
+        beds_with_villagers[k] = "vacant"
+    end
+    save_beds()
+end
+
+-- Beds in the area with nobody living in them - left empty when the
+-- village was settled, vacated by a death, or never settled at all - one
+-- position per bed.
+function lualore.house_spawning.free_beds(minp, maxp)
+    local out, seen = {}, {}
+    for _, pos in ipairs(minetest.find_nodes_in_area(minp, maxp, "group:bed")) do
+        local keys = bed_keys(pos)
+        if not seen[keys[1]] then
+            seen[keys[1]] = true
+            if keys[2] then
+                seen[keys[2]] = true
+            end
+            if beds_with_villagers[keys[1]] ~= true
+                    and not (keys[2] and beds_with_villagers[keys[2]] == true) then
+                out[#out + 1] = pos
+            end
+        end
+    end
+    return out
+end
+
+-- Settle one free bed with a villager of `class`. Returns how many were
+-- spawned (1, or 0 if it failed).
+function lualore.house_spawning.settle_bed(bed_pos, class)
+    for _, k in ipairs(bed_keys(bed_pos)) do
+        beds_with_villagers[k] = nil
+    end
+    reserve(bed_pos, class)
+    local p = vector.round(bed_pos)
+    local spawned = lualore.house_spawning.populate(vector.subtract(p, {x=1,y=1,z=1}),
+        vector.add(p, {x=1,y=1,z=1}))
+    save_beds()
+    return spawned
+end
     local data = storage:get_string("beds_with_villagers")
     if data and data ~= "" then
         beds_with_villagers = minetest.deserialize(data) or {}

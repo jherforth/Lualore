@@ -551,6 +551,12 @@ local function register_villager(class_name, class_def, biome_name, biome_config
 				lualore.jobs.release_station(self)
 			end
 
+			-- ...and the bed, so the village can invite someone into it
+			if self.nv_house_pos and lualore.house_spawning
+					and lualore.house_spawning.vacate then
+				lualore.house_spawning.vacate(self.nv_house_pos)
+			end
+
 			-- Clean up mood indicator
 			if self.nv_mood_indicator_id then
 				local indicator = minetest.get_objects_by_id(self.nv_mood_indicator_id)

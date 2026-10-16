@@ -9,6 +9,29 @@ newcomer of that trade walks in from the edge of the village and settles.
 
 ## For players
 
+### Filling an empty bed first
+
+Villages rarely have one villager per bed: some beds are left empty when a
+village is settled, and a bed is freed when its villager dies. While the
+village has an empty bed, the notice board offers **Invite a settler**
+instead of a commission:
+
+- It needs only **10 standing**, so a Stranger who has made a start can
+  use it. No materials are needed.
+- Choose the trade; a settler of that trade walks in from the road and
+  takes the empty bed nearest the board.
+- If there is no workstation for that trade within reach of the bed, one
+  is built nearby.
+
+**Commissions open only once every bed is taken.** Then the only way to
+bring someone new in is to build them a house.
+
+A bed freed by a death is marked *vacant*. The automatic settler leaves it
+alone, so a death isn't silently undone, and only an invitation fills it.
+Before this, a dead villager's bed stayed marked as taken forever.
+
+### Commissioning a house
+
 1. **Find the notice board** near the middle of the village. Villages
    generated from now on have one. For an existing village, a server admin
    runs `/furnish_village` standing in it. The board is also craftable:
