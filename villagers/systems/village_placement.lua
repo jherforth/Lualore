@@ -210,12 +210,31 @@ local function biome_matches(pattern, biome)
 	return a == b
 end
 
-local function palette_for_pos(x, z)
-	local data = minetest.get_biome_data({x = x, y = 64, z = z})
-	if not data then
-		return nil
+-- The biome at the surface of a column. Biomes depend on height, and the
+-- ones a village cares about most sit right at the waterline: Asuna's
+-- shore, ocean, swamp and alder swamp biomes all end by y = 7, most by
+-- y = 3. Asking at a fixed height (this used to ask at y = 64) reports a
+-- lakeside as whatever upland biome lies above it, which is why lake
+-- villages almost never appeared. So sample at the first ground or water
+-- down the column, passing through tree canopy. Unloaded columns fall back
+-- to y = 64; the candidate is retried once its chunk is generated anyway.
+local function surface_biome(x, z)
+	local y = 64
+	for cy = Y_MAX, Y_MIN, -1 do
+		local name = get_name({x = x, y = cy, z = z})
+		if is_unknown(name) then
+			break
+		end
+		if is_liquid(name) or (is_walkable(name) and not is_treeish(name)) then
+			y = cy
+			break
+		end
 	end
-	local biome = minetest.get_biome_name(data.biome)
+	local data = minetest.get_biome_data({x = x, y = y, z = z})
+	return data and minetest.get_biome_name(data.biome) or nil
+end
+
+local function palette_for_biome(biome)
 	if not biome then
 		return nil
 	end
@@ -227,6 +246,19 @@ local function palette_for_pos(x, z)
 		end
 	end
 	return nil
+end
+
+-- The surface biome first, so a shore or swamp is seen as one. If that has
+-- no palette (dunes, beaches and other thin lowland bands nobody listed),
+-- fall back to the biome at y = 64, as before, so nothing that used to get
+-- a village loses it.
+local function palette_for_pos(x, z)
+	local palette = palette_for_biome(surface_biome(x, z))
+	if palette then
+		return palette
+	end
+	local data = minetest.get_biome_data({x = x, y = 64, z = z})
+	return palette_for_biome(data and minetest.get_biome_name(data.biome))
 end
 
 -- Fallback selection for worlds whose biome names are missing or renamed:
@@ -260,8 +292,7 @@ end
 -- block as fallback. Returns palette (or nil), biome name, whether the
 -- fallback was used, and the ground block that decided it.
 local function select_palette(x, z)
-	local data = minetest.get_biome_data({x = x, y = 64, z = z})
-	local biome = data and minetest.get_biome_name(data.biome) or "?"
+	local biome = surface_biome(x, z) or "?"
 	local palette = palette_for_pos(x, z)
 	if palette then
 		return palette, biome, false, nil
@@ -1137,8 +1168,7 @@ minetest.register_chatcommand("village_probe", {
 					local dx, dz = cx - px, cz - pz
 					if dx * dx + dz * dz <= radius * radius then
 						stats.cand = stats.cand + 1
-						local data = minetest.get_biome_data({x = cx, y = 64, z = cz})
-						local biome = data and minetest.get_biome_name(data.biome) or "<nil>"
+						local biome = surface_biome(cx, cz) or "<nil>"
 						biomes[biome] = true
 						local palette = select_palette(cx, cz)
 						if not palette then
@@ -1197,8 +1227,7 @@ minetest.register_chatcommand("village_probe", {
 			return out
 		end
 
-		local my_data = minetest.get_biome_data({x = px, y = 64, z = pz})
-		local my_biome = my_data and minetest.get_biome_name(my_data.biome) or "<nil>"
+		local my_biome = surface_biome(px, pz) or "<nil>"
 		local my_palette = select_palette(px, pz)
 		local my_line
 		if my_palette then
