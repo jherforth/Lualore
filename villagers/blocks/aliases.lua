@@ -81,3 +81,21 @@ table.sort(lualore.village_marker_list) -- stable order, easier to log
 minetest.log("action", string.format(
 	"[lualore] Village props: %d legacy aliases, %d biome markers",
 	alias_count, #lualore.village_marker_list))
+
+-- Decorations a few schematics carry from mods this one does not need. They
+-- are listed in optional_depends so that, when installed, they load first
+-- and are used; when not, the node quietly becomes air instead of an
+-- "unknown node" block in the middle of a church or a castle.
+for _, name in ipairs({
+	"bottles:bottle_of_crystal_cave_dirt_with_moss",   -- cave castle shelves
+	"bottles:bottle_of_mineral_lava_stone_with_moss",
+	"bottles:bottle_of_crystal_cave_dirt",
+	"butterflies:hidden_butterfly_red",                -- grassland church
+	"butterflies:butterfly_white",
+	"wielded_light:10",                                -- grassland house 4 (an invisible light)
+	"ethereal:illumishroom3",                          -- cave castle
+}) do
+	if not minetest.registered_items[name] then
+		minetest.register_alias(name, "air")
+	end
+end

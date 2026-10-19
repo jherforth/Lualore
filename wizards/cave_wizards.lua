@@ -75,7 +75,8 @@ local function update_wizard_armor(self, wizard_texture, armor_item)
 	local hp_percent = hp / max_hp
 
 	-- Show armor only if HP is above 30% (armor "breaks" when wizard is low health)
-	if hp_percent > 0.3 and armor_item then
+	-- the armour overlay is 3d_armor's own texture, so only with 3d_armor
+	if hp_percent > 0.3 and armor_item and minetest.registered_items[armor_item] then
 		-- Get armor texture from item name
 		-- Format: 3d_armor:chestplate_type -> 3d_armor_chestplate_type.png
 		local armor_texture = armor_item:gsub(":", "_") .. ".png"

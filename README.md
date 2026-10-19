@@ -133,10 +133,33 @@ Villagers open the door they are about to walk through and close it behind them 
 
 ## Dependencies
 
-- **mobs** (mobs_redo), **default**, **farming**, **3d_armour** - Required
-- **caverealms**, **everness**, **ethereal** - Required for biome support
-- **intllib** - Optional (for translations)
-- **OR** play on an **Asuna**, which includes all dependencies
+Lua Lore runs in any game built on **Minetest Game** with three mods added:
+
+- **mobs** ([mobs_redo](https://content.luanti.org/packages/TenPlus1/mobs/)): every villager, Sky Folk, valkyrie, wizard and creature is a mobs_redo mob. *Asuna does not include it; install it alongside Asuna.*
+- **everness**: the sky islands, crystals, the valkyrie chest and the portal towns are built from it.
+- **caverealms**: the wizard castles stand on its statue and are dressed in its stone.
+
+The rest of the hard list is Minetest Game itself, which every MTG-based game ships:
+
+| Mod | Why it is needed |
+|---|---|
+| default, farming, stairs, doors, beds, xpanes, walls, vessels, wool, flowers | The village schematics are built from these blocks. **beds** matters most: villagers settle from beds, so a village with no beds has no people. |
+| player_api | Villagers, Sky Folk, valkyries and wizards all use its `character.b3d` model. |
+
+**Optional.** These are used when present and skipped when not:
+
+| Mod | What it adds |
+|---|---|
+| ethereal, naturalbiomes, livingjungle, japaneseforest, prairie, frost_land, dorwinion, badland | More biomes that villages and ruins recognise. |
+| 3d_armor | Armour as Sky Folk quest rewards, and the wizards' armour. Without it, quests pay out gold instead and wizards wear none. |
+| x_farming, bonemeal | Extra village chest loot. |
+| animalworld, livingfloatlands, fishing | Creatures the exploding toads fear or follow. |
+| bottles, butterflies, wielded_light | A few decorations in the castle and grassland schematics. Without them those spots are left empty. |
+| fire | Sounds for lighting and putting out portals. |
+| sfinv, unified_inventory | The Lore page in the inventory. |
+| intllib | Translations on very old engines. |
+
+**Asuna** has everything above except mobs_redo.
 
 ## Usage
 

@@ -174,9 +174,34 @@ local quest_pool = {
 --------------------------------------------------------------------
 -- Assign a random quest to a Sky Folk (ephemeral, not persisted)
 --------------------------------------------------------------------
+-- Only items this game actually has: most reward sets are 3d_armor pieces,
+-- and without that mod a Sky Folk would pay out "Unknown Item".
+local function all_registered(items)
+	for _, item in ipairs(items) do
+		if not minetest.registered_items[item.name] then
+			return false
+		end
+	end
+	return true
+end
+
+local FALLBACK_REWARD = {{name = "default:gold_ingot", count = 4}}
+
 function lualore.sky_folk_quests.assign_quest(self)
-	local quest = quest_pool[math.random(1, #quest_pool)]
-	local reward_set = quest.reward_sets[math.random(1, #quest.reward_sets)]
+	local usable = {}
+	for _, q in ipairs(quest_pool) do
+		if all_registered(q.required_items) then
+			usable[#usable + 1] = q
+		end
+	end
+	local quest = usable[math.random(1, math.max(1, #usable))] or quest_pool[1]
+	local sets = {}
+	for _, set in ipairs(quest.reward_sets) do
+		if all_registered(set) then
+			sets[#sets + 1] = set
+		end
+	end
+	local reward_set = #sets > 0 and sets[math.random(1, #sets)] or FALLBACK_REWARD
 
 	self.sf_quest = {
 		name          = quest.name,
