@@ -581,11 +581,18 @@ local function register_villager(class_name, class_def, biome_name, biome_config
 				minetest.log("action", "[lualore] Not a player punch")
 				return
 			end
+			local player_name = hitter:get_player_name()
 
 			-- Punching with an item the villager wants is a trade, not an
 			-- attack. Same code path as sneak + right-click.
 			if try_trade(self, hitter) then
 				return
+			end
+
+			-- Anything else is a blow, and the village's guardians saw it
+			-- (wooden_guardian.lua). Raiders and hostiles have no guardian.
+			if lualore.guardian and lualore.guardian.is_protected(self) then
+				lualore.guardian.alert(self.object:get_pos(), hitter)
 			end
 
 			-- DEFENSIVE BEHAVIOR: If this is an NPC being attacked (not a trade), fight back!

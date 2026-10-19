@@ -110,6 +110,7 @@ dofile(modpath .. "/caves/lit.lua")
 -- 6. Optional/fun extras
 dofile(modpath .. "/villagers/extras/explodingtoad.lua")
 dofile(modpath .. "/villagers/extras/loot.lua")
+dofile(modpath .. "/villagers/extras/wooden_guardian.lua")
 
 -- 6b. Procedural ruins (broken castles, towers, walls, stone circles)
 dofile(modpath .. "/ruins/ruins.lua")

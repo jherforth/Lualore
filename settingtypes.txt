@@ -222,3 +222,11 @@ lualore_village_max_commissions (Commissioned houses per village) int 8 0 30
 
 # How much more each commission costs than the last (0.25 = 25% more).
 lualore_commission_cost (Commission cost growth) float 0.25 0.0 2.0
+
+# -------------------------------------------------------------------
+# Wooden Guardian (see villagers/WOODEN_GUARDIAN.md)
+# -------------------------------------------------------------------
+
+# Give every village a Wooden Guardian that patrols it and fights
+# monsters. Players can still build their own when this is off.
+lualore_village_guardians (Village guardians) bool true

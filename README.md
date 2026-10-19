@@ -92,6 +92,10 @@ a village that knows you shares more of what it makes. It can only go up. See
 
 Every village has a **notice board**. While the village has an empty bed, anyone with a little standing (10) can invite a settler of the trade they choose to come and take it, no materials needed. Once every bed is taken, earn a village's trust and you can commission a new house there and choose who will live in it — a farmer, a smith, a cleric, a fisherman, a jeweler, an entertainer or a ranger. The village picks a plot on its edge and posts a bill of materials drawn from the very house it means to build: thatch and stone for a grassland cottage, sandstone for a desert one. Anyone can chip in. Once it is all delivered the house rises layer by layer on scaffolding, and when it is finished the newcomer walks in from the road, thanks you by name, and starts work at a workstation built beside their new home. Each house costs more than the last and needs a closer bond with the village, up to eight per village. See `villagers/VILLAGE_EXPANSION.md`.
 
+### 🌳 The Wooden Guardian
+
+Every village has a **Wooden Guardian**: a walking tree half again as tall as you, with mossy shoulders, knotted fists and amber eyes. It walks a circuit of the village and smashes the monsters that come near, and it never touches a villager. You can wake your own from **any kind of wood**. Craft a **Guardian Heart** (8 planks round a mese crystal), stand four logs in a T, two stacked with one either side of the upper one, and set the heart on top. Mend it by right-clicking it with planks or logs. It sees a villager struck and comes for whoever did it for thirty seconds, even the player who built it. See `villagers/WOODEN_GUARDIAN.md`.
+
 ### 🏗️ Village Buildings
 
 Each biome has unique structures: houses, churches, markets, stables and more. A village plan is computed first (flat ground, no overlapping footprints) and only then placed, so buildings always form a clean hamlet instead of scattering or overwriting each other.

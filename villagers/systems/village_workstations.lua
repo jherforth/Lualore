@@ -297,6 +297,34 @@ local function place_board(site, map, pr)
 	return 1, pos
 end
 
+-- The village's Wooden Guardian (wooden_guardian.lua), on open ground a
+-- little way out from the middle. Skipped if one is already about, so
+-- /furnish_village never doubles one up. It is spawned a moment later,
+-- once the freshly built village has settled into the map.
+local GUARDIANS = minetest.settings:get_bool("lualore_village_guardians", true)
+
+local function place_guardian(site, map, pr)
+	local g = lualore.guardian
+	if not (GUARDIANS and g and g.spawn) then
+		return 0
+	end
+	local centre = {x = site.cx, y = site.floor_y, z = site.cz}
+	if g.near(centre, site.radius or 34) then
+		return 0
+	end
+	local x, y, z = find_spot(site, map, 1, 6, 14, pr, 1)
+	if not x then
+		return 0
+	end
+	local feet = {x = x, y = y + 0.5, z = z}
+	minetest.after(3, function()
+		if not g.near(centre, site.radius or 34) then
+			g.spawn(feet, centre)
+		end
+	end)
+	return 1, {x = x, y = y + 1, z = z}
+end
+
 -- A single station node near (cx, cz): for trades with no placer of their
 -- own.
 local function place_single(site, map, pr, node)
@@ -349,6 +377,10 @@ function lualore.workstations.furnish(site)
 	placed = placed + (n or 0)
 	results.board = pos
 
+	n, pos = place_guardian(site, map, pr)
+	placed = placed + (n or 0)
+	results.guardian = pos
+
 	local palette_name = site.palette and site.palette.name
 	if not (palette_name and NO_FARM[palette_name]) then
 		local farms = 1 + ((site.seed or 0) % 3 == 0 and 1 or 0)
@@ -400,7 +432,8 @@ end
 minetest.register_chatcommand("furnish_village", {
 	params = "[radius]",
 	description = S("Add the missing workstations (anvil, forge, altar, " ..
-		"farm plots) and the notice board to the village you are standing in."),
+		"farm plots), the notice board and the Wooden Guardian to the village " ..
+		"you are standing in."),
 	privs = {server = true},
 	func = function(name, param)
 		local player = minetest.get_player_by_name(name)
