@@ -261,10 +261,23 @@ local function palette_for_pos(x, z)
 	return palette_for_biome(data and minetest.get_biome_name(data.biome))
 end
 
+-- Ground that says nothing about the biome it is in: beach and riverbank
+-- sand, bare earth, clay. These are on every palette's shoreline, and
+-- letting default:sand pick a palette is how a sandbar in a meadow became
+-- a desert village. They still count as a palette's own surface for the
+-- centre check (center_ok); they just never choose the palette.
+local NEUTRAL_GROUND = {
+	["default:sand"] = true, ["default:dirt"] = true, ["default:clay"] = true,
+	["default:gravel"] = true,
+}
+
 -- Fallback selection for worlds whose biome names are missing or renamed:
 -- choose the palette by the actual ground block under the candidate - the
 -- same "spawn on these blocks" idea the old decoration system used.
 local function palette_for_node(node_name)
+	if NEUTRAL_GROUND[node_name] then
+		return nil
+	end
 	for _, palette in ipairs(get_palettes()) do
 		for _, surface in ipairs(palette.surface) do
 			if surface == node_name then
@@ -275,10 +288,12 @@ local function palette_for_node(node_name)
 	return nil
 end
 
+-- The ground block at the top of a column. Under water there is no
+-- answer: the bed of a lake is sand whatever the biome round it.
 local function find_surface_node(x, z)
 	for y = Y_MAX, Y_MIN, -1 do
 		local name = get_name({x = x, y = y, z = z})
-		if is_unknown(name) then
+		if is_unknown(name) or is_liquid(name) then
 			return nil
 		end
 		if is_walkable(name) and not is_treeish(name) then
@@ -288,10 +303,10 @@ local function find_surface_node(x, z)
 	return nil
 end
 
--- Palette decision used by the placement driver: biome name first, ground
--- block as fallback. Returns palette (or nil), biome name, whether the
--- fallback was used, and the ground block that decided it.
-local function select_palette(x, z)
+-- One column's opinion: biome name first, ground block as fallback.
+-- Returns palette (or nil), biome name, whether the fallback was used,
+-- and the ground block that decided it.
+local function column_palette(x, z)
 	local biome = surface_biome(x, z) or "?"
 	local palette = palette_for_pos(x, z)
 	if palette then
@@ -305,6 +320,85 @@ local function select_palette(x, z)
 		end
 	end
 	return nil, biome, false, nil
+end
+
+-- A village is 50 to 70 nodes across, but its style used to be decided by
+-- the one column at its centre. A centre that landed on a beach, a dune or
+-- the tip of a neighbouring biome put a desert village in a meadow. Now
+-- the footprint votes: the centre and two rings round it, and one palette
+-- needs VOTE_SHARE of the votes cast. Columns with no opinion (open water,
+-- bare sand in a biome nobody listed) abstain, but at least VOTE_MIN must
+-- vote. A site that straddles two biomes gets no village; the next cell
+-- over will.
+--
+-- A palette can ask for less with `vote_share`, used only when the centre
+-- itself votes for it. Lake villages want that: a shore is half water and
+-- half the forest behind it, and holding them to a majority would make
+-- them rarer than they already are.
+local VOTE_RINGS = {{r = 12, n = 6}, {r = 24, n = 10}}
+local VOTE_SHARE = 0.7
+local VOTE_MIN = 6
+
+local function vote_points(x, z)
+	local pts = {{x = x, z = z}}
+	for _, ring in ipairs(VOTE_RINGS) do
+		for i = 0, ring.n - 1 do
+			local a = i / ring.n * 2 * math.pi
+			pts[#pts + 1] = {
+				x = math.floor(x + math.cos(a) * ring.r + 0.5),
+				z = math.floor(z + math.sin(a) * ring.r + 0.5),
+			}
+		end
+	end
+	return pts
+end
+
+-- Palette decision used by the placement driver. Returns palette (or nil),
+-- the centre's biome name, whether the winner was chosen by ground blocks
+-- rather than biome names, an example ground block, and the tally as text
+-- ("grassland 15/17, desert 2/17") for the logs and /village_probe.
+local function select_palette(x, z)
+	local pts = vote_points(x, z)
+	local votes, by_node, node_seen = {}, {}, {}
+	local centre_biome, centre_palette
+	for i, p in ipairs(pts) do
+		local palette, biome, via_node, node = column_palette(p.x, p.z)
+		if i == 1 then
+			centre_biome, centre_palette = biome, palette
+		end
+		if palette then
+			votes[palette] = (votes[palette] or 0) + 1
+			if via_node then
+				by_node[palette] = (by_node[palette] or 0) + 1
+				node_seen[palette] = node_seen[palette] or node
+			end
+		end
+	end
+
+	local best, best_n, cast = nil, 0, 0
+	local parts = {}
+	for _, palette in ipairs(get_palettes()) do
+		local n = votes[palette]
+		if n then
+			cast = cast + n
+			parts[#parts + 1] = string.format("%s %d/%d", palette.name or "?", n, #pts)
+			if n > best_n then
+				best, best_n = palette, n
+			end
+		end
+	end
+	local tally = #parts > 0 and table.concat(parts, ", ") or "no votes"
+
+	local own = centre_palette and centre_palette.vote_share
+	if cast < VOTE_MIN then
+		return nil, centre_biome, false, nil, tally
+	elseif own and votes[centre_palette] >= own * cast then
+		best, best_n = centre_palette, votes[centre_palette]
+	elseif not best or best_n < VOTE_SHARE * cast then
+		return nil, centre_biome, false, nil, tally
+	end
+	local via_node = (by_node[best] or 0) * 2 > best_n
+	return best, centre_biome, via_node, node_seen[best], tally
 end
 
 -- Scanning window of a palette, intersected with the global band.
@@ -937,9 +1031,14 @@ local function attempt_cell(cell_x, cell_z, minp, maxp)
 		return
 	end
 
-	local palette, biome, via_node, node_name = select_palette(cx, cz)
+	local palette, biome, via_node, node_name, tally = select_palette(cx, cz)
 	if not palette then
 		tried[key] = true
+		if tally ~= "no votes" then
+			minetest.log("info", string.format(
+				"[lualore] Village cell %s passed over: mixed biomes (%s)", key, tally))
+			return
+		end
 		if not warned_biomes[biome] then
 			warned_biomes[biome] = true
 			minetest.log("action", "[lualore] Villages: no palette for biome '" ..
@@ -1241,7 +1340,7 @@ minetest.register_chatcommand("village_probe", {
 		end
 
 		local my_biome = surface_biome(px, pz) or "<nil>"
-		local my_palette = select_palette(px, pz)
+		local my_palette, _, _, _, my_tally = select_palette(px, pz)
 		local my_line
 		if my_palette then
 			local top, bottom = palette_window(my_palette)
@@ -1255,6 +1354,7 @@ minetest.register_chatcommand("village_probe", {
 		else
 			my_line = "your column: biome=" .. my_biome .. " -> NO PALETTE for this biome"
 		end
+		my_line = my_line .. " | footprint vote: " .. tostring(my_tally)
 
 		local lines = {
 			string.format("[village_probe] %s spacing=%d chance=%.2f records=%d",

@@ -26,9 +26,17 @@ made building density nearly impossible to tune:
 - The world is divided into a grid of `spacing × spacing` cells. Each cell has
   **one** candidate position, jittered in the middle half of the cell — two
   villages can never be closer than half the spacing.
-- A cell spawns a village when it passes the `chance` roll and the biome at
-  the candidate maps to a palette (if the biome is unknown, the ground block
-  under the candidate picks the palette instead).
+- A cell spawns a village when it passes the `chance` roll and its
+  **footprint agrees on a palette**. Seventeen columns vote: the centre, six
+  at 12 nodes out and ten at 24. Each column votes by its biome, or by its
+  ground block if the biome is unknown. Open water and neutral ground
+  (sand, bare dirt, clay, gravel) abstain. One palette needs 70% of the
+  votes cast, from at least six columns. A site on a biome border gets no
+  village, so a desert village can't land in a meadow because its centre
+  hit a sandy patch. A palette can ask for less with `vote_share`, which
+  counts only when the centre votes for it. Lake villages use 0.25, since a
+  shore is half water and half the forest behind it. `/village_probe`
+  prints the vote for the column you're standing on.
 - The site is **terraformed** before anything is built
   (`lualore_village_terraform`): the village floor is levelled to the
   palette's ground block (dips filled, hills cut, up to
@@ -135,6 +143,8 @@ lualore.village_palettes.grassland = {
     offset = -6,          -- schematic base sunk into the ground (foundation)
     y_min = ..., y_max = ...,                    -- optional search band override
     water_ok = false,     -- lake shores allow water around them
+    vote_share = nil,     -- optional: share of the site vote it needs when
+                          -- the centre votes for it (lake: 0.25)
     ground = {            -- optional: how the levelled floor is textured
         accents = {                              -- {node, percent of the site}
             {"default:dirt", 7},
@@ -178,10 +188,12 @@ variants (those are spreading types themselves, so they stay put).
   name to the relevant `biomes` list. The server log prints
   `[lualore] Villages: no palette for biome 'X'` the first time an
   unrecognized biome gets a candidate, so renames never fail silently.
-- When a biome has no palette at all, the placer falls back to the ground
-  block under the candidate (the same "spawn on these nodes" idea the old
-  decoration system used): the first palette whose `surface` list contains
-  that block is chosen, logged once per biome. Tree parts (trunks, leaves,
+- When a biome has no palette at all, the column falls back to its ground
+  block (the same "spawn on these nodes" idea the old decoration system
+  used): the first palette whose `surface` list contains that block gets
+  the vote, logged once per biome. Neutral ground (`default:sand`, `dirt`,
+  `clay`, `gravel`) never votes this way, and neither does the bed of a lake
+  or river. Tree parts (trunks, leaves,
   wood) are never treated as ground - villages base on the soil beneath
   trees, and houses replace whatever stands inside their footprint.
 - Already-generated terrain keeps whatever it had before this system (old

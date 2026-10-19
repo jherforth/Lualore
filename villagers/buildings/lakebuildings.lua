@@ -24,6 +24,10 @@ lualore.village_palettes.lake = {
 		"naturalbiomes:alderswamp_litter",     -- alder swamp
 	},
 	offset = 0,      -- stilts are part of the schematics
+	-- A shore is half water, half the forest behind it: the site vote in
+	-- village_placement.lua takes a lake village on a quarter of the
+	-- footprint, so long as its centre is on the shore.
+	vote_share = 0.25,
 	-- Ground dressing (villagers/systems/village_ground.lua): a shoreline
 	-- of grass giving way to sand and gravel.
 	ground = {
