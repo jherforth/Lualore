@@ -113,13 +113,16 @@ class MeshBuilder:
             u0, v0, u1, v1 = ZONES[z]
             inset = 1.0 / 128.0
             u0, v0, u1, v1 = u0 + inset, v0 + inset, u1 - inset, v1 - inset
-            rh = hw if right[0] != 0 else (hh if right[1] != 0 else hd)
-            uh = hh if up[1] != 0 else (hw if up[0] != 0 else hd)
+            def half(axis):
+                return hw if axis[0] != 0 else (hh if axis[1] != 0 else hd)
+            rh, uh, nh = half(right), half(up), half(n)
+            # the face sits on the box's surface, nh out from the centre
+            fx, fy, fz = cx + n[0] * nh, cy + n[1] * nh, cz + n[2] * nh
             verts = []
             for ru, rv in ((-rh, -uh), (rh, -uh), (rh, uh), (-rh, uh)):
-                verts.append((cx + right[0] * ru + up[0] * rv,
-                              cy + right[1] * ru + up[1] * rv,
-                              cz + right[2] * ru + up[2] * rv))
+                verts.append((fx + right[0] * ru + up[0] * rv,
+                              fy + right[1] * ru + up[1] * rv,
+                              fz + right[2] * ru + up[2] * rv))
             a = tuple(verts[1][i] - verts[0][i] for i in range(3))
             c = tuple(verts[2][i] - verts[0][i] for i in range(3))
             w = cross(a, c)
@@ -135,6 +138,22 @@ class MeshBuilder:
             o = len(self.positions) - 4
             self.indices += [o, o + 1, o + 2, o, o + 2, o + 3]
             self.face_zone.append(z)
+        # Every box must come out as a closed box of the requested size: each
+        # face flat on its own side, and the six together spanning the box.
+        # (The first version left every face through the centre, which drew
+        # as crossed planes in game.)
+        box = self.positions[-24:]
+        for k, (c, s) in enumerate(zip(center, size)):
+            lo, hi = min(p[k] for p in box), max(p[k] for p in box)
+            assert abs(lo - (c - s / 2)) < 1e-9 and abs(hi - (c + s / 2)) < 1e-9, \
+                "box %s does not span its size on axis %d" % (center, k)
+        for f in range(6):
+            quad = box[f * 4:f * 4 + 4]
+            nrm = self.normals[-24 + f * 4]
+            axis = [i for i in range(3) if nrm[i] != 0][0]
+            want = center[axis] + nrm[axis] * size[axis] / 2
+            assert all(abs(p[axis] - want) < 1e-9 for p in quad), \
+                "face %s of box %s is not on the box surface" % (nrm, center)
 
 
 def build_mesh():
@@ -511,6 +530,16 @@ ZONE_COLOUR = {"bark": (110, 76, 44), "face": (120, 84, 50), "ends": (170, 128, 
                "moss": (66, 128, 46), "knot": (84, 56, 32)}
 
 
+def _unit(v):
+    n = math.sqrt(sum(c * c for c in v))
+    return tuple(c / n for c in v)
+
+
+# camera directions: front (the face is at -Z), the model's left, and a
+# raised three-quarter view, where boxes that are not closed show at once
+VIEWS = {"front": (0, 0, -1), "side": (1, 0, 0), "quarter": _unit((0.65, 0.45, -0.75))}
+
+
 def render(mb, t, view, scale=8, size=(320, 320)):
     mats = skin_matrices(t)
     img = Image.new("RGB", size, (200, 214, 230))
@@ -526,12 +555,15 @@ def render(mb, t, view, scale=8, size=(320, 320)):
         nrm = cross([pts[1][i] - pts[0][i] for i in range(3)], [pts[2][i] - pts[0][i] for i in range(3)])
         ln = math.sqrt(sum(c * c for c in nrm)) or 1
         nrm = [c / ln for c in nrm]
-        if view == "front":       # looking along +Z at the face (which is at -Z)
-            proj = [(-p[0], p[1], -p[2]) for p in pts]
-            facing = -nrm[2]
-        else:                     # from the model's left (+X)
-            proj = [(p[2], p[1], p[0]) for p in pts]
-            facing = nrm[0]
+        # cam points from the model towards the camera
+        cam = VIEWS[view]
+        r = cross((0, 1, 0), cam)
+        rl = math.sqrt(sum(c * c for c in r))
+        r = [c / rl for c in r]
+        u = cross(cam, r)
+        proj = [(sum(p[i] * r[i] for i in range(3)), sum(p[i] * u[i] for i in range(3)),
+                 sum(p[i] * cam[i] for i in range(3))) for p in pts]
+        facing = sum(nrm[i] * cam[i] for i in range(3))
         if facing <= 0:
             continue
         depth = sum(p[2] for p in proj) / 4
@@ -565,10 +597,11 @@ def main():
         out = sys.argv[sys.argv.index("--preview") + 1]
         os.makedirs(out, exist_ok=True)
         shots = [("idle", 0.0), ("walk", 2.75), ("windup", 4.36), ("slam", 4.5)]
-        sheet = Image.new("RGB", (320 * len(shots), 640), (255, 255, 255))
+        sheet = Image.new("RGB", (320 * len(shots), 960), (255, 255, 255))
         for i, (label, t) in enumerate(shots):
             sheet.paste(render(mb, t, "front"), (320 * i, 0))
             sheet.paste(render(mb, t, "side"), (320 * i, 320))
+            sheet.paste(render(mb, t, "quarter"), (320 * i, 640))
             ImageDraw.Draw(sheet).text((320 * i + 8, 6), label, fill=(0, 0, 0))
         sheet.save(os.path.join(out, "guardian_preview.png"))
         print("wrote preview %s" % os.path.join(out, "guardian_preview.png"))
