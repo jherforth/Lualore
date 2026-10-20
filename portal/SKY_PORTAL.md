@@ -53,6 +53,30 @@ generated; the player gets a message saying the portal is reaching up (or
 down). Anyone who walks off before it is ready stays where they are — the far
 portal is still built and linked, so their next trip is instant.
 
+### Mobs travel too
+
+Any mob that stands in a sheet for **2 seconds longer than a player would**
+(4 seconds by default) goes through: Wooden Guardians, villagers, Sky Folk,
+valkyries, and other mods' mobs alike. A mob that just brushes past a sheet
+isn't taken. Lead a guardian into a portal and it comes out on the far side.
+
+- **Only through a portal a player has already opened.** A mob in a portal
+  nobody has travelled through stays put, so a wandering villager can never
+  raise a sky town or a castle.
+- Like a player, a mob comes out in the far portal (anywhere along its
+  floor, so a crowd doesn't stack up) and has to step out before it can
+  travel again.
+- Mobs are only watched within 32 nodes of a player, which is about as far
+  as the server keeps them active anyway. Mobs being ridden or carried
+  don't travel on their own.
+- **A Wooden Guardian** keeps watch where it comes out: it patrols the
+  nearest village there, or round the portal it came out of.
+- **Sky Folk** brought down to the ground forget the island footing they
+  were kept on.
+- **A valkyrie from a chest fight** can be led through, and the fight
+  carries on: it still counts when it is defeated on the other side.
+- Turn it all off with `lualore_portal_mobs`.
+
 ## 4. Where it goes: a sky village
 
 Luanti has no separate dimensions. The sky islands are Asuna's floatlands,
@@ -152,7 +176,8 @@ there:
 
 - Set any Everness crystal (`everness:crystal_purple`, `_orange` or
   `_cyan`) on top of the frame's roof. A frame lit while wearing one burns
-  **black**, and so does an already-lit portal the moment the crystal is
+  **black**, swirling with grey smoke (not violet, which reads as the
+  Nether), and so does an already-lit portal the moment the crystal is
   placed. Taking the crystal off turns it blue again. Either way the
   portal forgets its old link, since it now leads somewhere else.
 - **Where it leads:**
@@ -229,6 +254,7 @@ and buffer bounds, and emits a single 4-second `idle` animation.
 |---|---|---|
 | `lualore_sky_portals` | true | Portals light and carry players. When off, existing portals stay visible but inert. |
 | `lualore_portal_delay` | 2.0 | Seconds in the sheet before travelling. |
+| `lualore_portal_mobs` | true | Mobs go through portals a player has opened (after 2 more seconds than a player). |
 | `lualore_portal_sky_y` | 290 | Where the sky begins: portals above lead down, below lead up. |
 | `lualore_portal_village_reach` | 800 | Go to a portal village this close instead of founding one. |
 | `lualore_portal_village_houses` | 18 | Houses in a village a portal founds (6–30). The island grows to fit. |

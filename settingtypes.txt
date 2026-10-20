@@ -118,6 +118,11 @@ lualore_sky_portals (Sky portals) bool true
 # Seconds a player has to stand in a portal before it carries them.
 lualore_portal_delay (Sky portal delay) float 2.0 0.0 10.0
 
+# Mobs that stand in a portal sheet (2 seconds longer than a player) go
+# through too: guardians, villagers, Sky Folk, valkyries and other mobs.
+# Only through a portal a player has already opened.
+lualore_portal_mobs (Mobs use sky portals) bool true
+
 # Height from which a portal counts as being in the sky: portals at or
 # above it lead down, portals below it lead up, and the search for an
 # island starts here. Asuna's floatlands begin at y = 287.

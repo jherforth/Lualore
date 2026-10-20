@@ -223,6 +223,16 @@ local function find_home(pos)
 	return {x = math.floor(pos.x + 0.5), y = math.floor(pos.y + 0.5), z = math.floor(pos.z + 0.5)}
 end
 
+-- A guardian that came out of a portal keeps watch over wherever it came
+-- out (portal/sky_portal.lua), instead of trying to walk home.
+function lualore.guardian.rehome(ent)
+	local pos = ent.object and ent.object:get_pos()
+	if pos then
+		lualore.guardian.setup(ent, find_home(pos), ent._builder)
+		ent._pause, ent._leg_time = 0, 0
+	end
+end
+
 function lualore.guardian.setup(ent, home, builder)
 	ent._home = home
 	ent._builder = builder

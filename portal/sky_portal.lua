@@ -81,6 +81,13 @@ local SKY_Y = math.floor(setting_number("lualore_portal_sky_y", 290))
 -- Seconds a player has to stand in the sheet before it carries them.
 local TRAVEL_DELAY = setting_number("lualore_portal_delay", 2.0)
 
+-- Mobs travel too, through portals a player has already opened. They have
+-- to linger a little longer than a player, so a villager that brushes past
+-- a sheet is not whisked away.
+local MOB_TRAVEL = minetest.settings:get_bool("lualore_portal_mobs", true)
+local MOB_DELAY = TRAVEL_DELAY + 2
+local MOB_SCAN = 32 -- mobs this close to a player are watched
+
 -- Go to an existing portal village this close rather than founding a new
 -- one.
 local VILLAGE_REACH = math.floor(setting_number("lualore_portal_village_reach", 800))
@@ -478,8 +485,9 @@ local function swirl(frame, amount)
 		maxexptime = 1.8,
 		minsize = 1.0,
 		maxsize = 2.4,
-		glow = 12,
-		texture = "lualore_sky_portal.png^[verticalframe:32:0",
+		glow = frame.dark and 4 or 12,
+		texture = (frame.dark and "lualore_dark_portal.png" or "lualore_sky_portal.png")
+			.. "^[verticalframe:32:0",
 	})
 end
 
@@ -1379,6 +1387,149 @@ local function check_traveller(player, dtime)
 end
 
 -- ------------------------------------------------------------------
+-- Mobs through the portals
+-- ------------------------------------------------------------------
+-- Any mobs_redo mob that stands in a sheet long enough goes through: the
+-- guardians, villagers, Sky Folk and valkyries, and other mods' mobs too.
+-- Only through a portal that already leads somewhere: a mob never opens a
+-- new way, so nothing wandering about raises a sky town or a castle.
+-- A valkyrie of a chest fight keeps reporting in from wherever it is
+-- (valkyrie_fight.lua), so taking one through a portal neither wins nor
+-- breaks the fight.
+
+local function mob_feet(obj)
+	local prop = obj:get_properties()
+	local box = prop and prop.collisionbox
+	local p = obj:get_pos()
+	return p and {x = p.x, y = p.y + (box and box[2] or 0), z = p.z}, box
+end
+
+-- the sheet the mob is standing in, or nil
+local function portal_under_mob(obj)
+	local feet = mob_feet(obj)
+	if not feet then
+		return nil
+	end
+	local cellp = vector.round({x = feet.x, y = feet.y + 0.1, z = feet.z})
+	if is_sheet(node_name(cellp)) then
+		return cellp
+	end
+	local head = {x = cellp.x, y = cellp.y + 1, z = cellp.z}
+	if is_sheet(node_name(head)) then
+		return head
+	end
+	return nil
+end
+
+-- What changes for a mob when it comes out somewhere new.
+local function mob_arrived(ent)
+	-- Sky Folk are put back on their last safe footing if they fall; that
+	-- footing is back on the other side now
+	ent.sf_safe_pos = nil
+	ent.sf_safe_timer = nil
+	-- a guardian keeps watch where it came out
+	if ent.name == "lualore:wooden_guardian" and lualore.guardian
+			and lualore.guardian.rehome then
+		lualore.guardian.rehome(ent)
+	end
+end
+
+local function arrive_mob(obj, ent, dest_key)
+	local dest = records[dest_key]
+	local frame = frame_of(dest)
+	local dx, dz = step_of(frame.axis)
+	-- anywhere along the bottom of the sheet, so a crowd does not stack up
+	local i = math.random(0, frame.w - 1)
+	local spot = cell(frame.anchor, frame.axis, i, 0)
+	local _, box = mob_feet(obj)
+	obj:set_pos({x = spot.x, y = spot.y - 0.5 - (box and box[2] or 0) + 0.05, z = spot.z})
+	obj:set_velocity({x = 0, y = 0, z = 0})
+	-- face out of the sheet
+	local yaw = frame.axis == "x" and 0 or math.pi * 1.5
+	if math.random(2) == 1 then
+		yaw = yaw + math.pi
+	end
+	obj:set_yaw(yaw)
+	mob_arrived(ent)
+	swirl(frame, 15)
+	minetest.sound_play("magic",
+		{pos = centre_of(frame), gain = 0.6, max_hear_distance = 16}, true)
+end
+
+local function depart_mob(obj, ent, portal_pos)
+	local t = ent._lualore_portal
+	local node = minetest.get_node(portal_pos)
+	local frame = is_sheet(node.name)
+		and scan_frame(portal_pos, axis_of(node.param2))
+	if not frame then
+		t.must_leave = true
+		return
+	end
+	sync_crown(frame, node)
+	frame.dark = crowned(frame)
+	local key = remember(frame)
+	if not records[key].link then
+		t.must_leave = true -- a mob never opens a new way
+		return
+	end
+	t.busy = true
+	resolve(key, {name = ""}, function(dest_key)
+		t.busy = false
+		t.must_leave = true
+		-- the mob may have died, wandered off or been unloaded meanwhile
+		if not dest_key or not obj:get_pos() or obj:get_luaentity() ~= ent then
+			return
+		end
+		local feet = mob_feet(obj)
+		if still_at({get_pos = function() return feet end}, frame) then
+			arrive_mob(obj, ent, dest_key)
+		end
+	end)
+end
+
+local function check_mob(obj, ent, dtime)
+	if obj:get_attach() or (ent.health or 1) <= 0 then
+		return
+	end
+	local t = ent._lualore_portal
+	local pos = portal_under_mob(obj)
+	if not pos then
+		if t then
+			ent._lualore_portal = nil -- stepped out: free to travel again
+		end
+		return
+	end
+	if not t then
+		-- just walked in. (One that just came out of a sheet keeps the
+		-- state its trip left, must_leave and all, so it never bounces
+		-- straight back; mobs_redo saves it, so that holds across an unload.)
+		t = {timer = 0}
+		ent._lualore_portal = t
+	end
+	if t.must_leave or t.busy then
+		return
+	end
+	t.timer = t.timer + dtime
+	if t.timer >= MOB_DELAY then
+		t.timer = 0
+		depart_mob(obj, ent, pos)
+	end
+end
+
+local function check_mobs(dtime)
+	local seen = {}
+	for _, player in ipairs(minetest.get_connected_players()) do
+		for _, obj in ipairs(minetest.get_objects_inside_radius(player:get_pos(), MOB_SCAN)) do
+			local ent = not obj:is_player() and obj:get_luaentity()
+			if ent and ent._cmi_is_mob and not seen[ent] then
+				seen[ent] = true
+				check_mob(obj, ent, dtime)
+			end
+		end
+	end
+end
+
+-- ------------------------------------------------------------------
 -- Upkeep
 -- ------------------------------------------------------------------
 local DIRS = {
@@ -1438,6 +1589,9 @@ if ENABLED then
 		for _, player in ipairs(minetest.get_connected_players()) do
 			check_dropped_ingots(player)
 			check_traveller(player, step)
+		end
+		if MOB_TRAVEL then
+			check_mobs(step)
 		end
 	end)
 

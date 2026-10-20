@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate the swirling portal sheets: textures/lualore_sky_portal.png (blue,
-to the sky towns) and textures/lualore_dark_portal.png (black and violet, a
+to the sky towns) and textures/lualore_dark_portal.png (black and grey, a
 portal crowned with a crystal, to the wizard castles).
 
 The texture is a vertical strip of 16x16 frames, played by the node's
@@ -44,14 +44,15 @@ PALETTE = [
     (138, 206, 255),
     (205, 240, 255),
 ]
-# the dark portal: near-black, with violet light moving in it
+# the dark portal: near-black, with grey smoke moving in it. Not violet:
+# purple reads as the way to the Nether.
 DARK_PALETTE = [
-    (6, 4, 12),
-    (16, 8, 30),
-    (32, 14, 56),
-    (58, 22, 92),
-    (96, 40, 140),
-    (150, 80, 200),
+    (5, 5, 6),
+    (16, 16, 18),
+    (34, 34, 37),
+    (60, 60, 64),
+    (100, 100, 105),
+    (158, 158, 164),
 ]
 # the deep bands are more see-through, the highlights nearly solid
 ALPHA_MIN, ALPHA_MAX = 140, 225
