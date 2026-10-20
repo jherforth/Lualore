@@ -40,7 +40,9 @@ Before this, a dead villager's bed stayed marked as taken forever.
    fisherman (only in villages near water), jeweler, entertainer or ranger.
    You need **Guest** standing in that village.
 3. The village **chooses a plot** on its edge, plans one of its own house
-   designs and posts a **bill of materials**.
+   designs and posts a **bill of materials**. If there's no level ground
+   left, it builds on a **terrace**: higher or lower ground nearby, cut and
+   filled flat.
 4. **Deliver** with *Deliver what I carry*. It takes only what the house
    still needs, never more. Anyone can help, and each delivery earns
    standing.
@@ -100,6 +102,14 @@ The commissioner can withdraw a commission until the first delivery.
   - not protected.
 
   The plot and its margin are levelled to the village floor.
+- **Terraces.** A village hemmed in by hills, slopes or water gets a second
+  search over the same rings, used only when no level plot exists anywhere.
+  A terrace can stand on ground up to **10 nodes above or below** the
+  village floor. Its floor is the height of the ground at its middle, and
+  every column of the plot and its margin must be within **4 nodes** of
+  that. Higher ground is cut away and hollows are filled. A gentle slope
+  (1 in 2) or a lumpy hillside can be terraced; a cliff or anything steeper
+  can't. A plateau well above the village isn't part of it.
 - **Building layer by layer.** Each layer is a one-high slice of the
   schematic, placed with `place_schematic` and the house's rotation, so a
   house built a layer at a time is identical to one placed at once. That

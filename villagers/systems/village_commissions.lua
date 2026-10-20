@@ -18,7 +18,10 @@
 --   materials without a table to maintain.
 -- * The plot is found the way the workstation placer finds room: open,
 --   level-enough ground under open sky, clear of houses, paths, water and
---   trees, as close to the village as there is room.
+--   trees, as close to the village as there is room. Ground level with the
+--   village comes first. A village hemmed in by hills or slopes then gets a
+--   terrace: a plot on higher or lower ground nearby, cut and filled level
+--   at its own height.
 -- * Anyone can deliver, and delivering earns standing.
 -- * A village grows by at most lualore_village_max_commissions houses.
 --   The first two need Guest standing, the next three Friend, the rest Kin.
@@ -48,6 +51,8 @@ local BUILD_RANGE = 96      -- ...while a player is this close
 local SEARCH_MIN, SEARCH_MAX = 14, 90 -- plot search rings around the village
 local MARGIN = 3            -- open ground kept round a new house
 local LEVEL_SLACK = 2       -- plot ground may be this far off the village floor
+local TERRACE_SLACK = 4     -- ...or, on a terrace, this far off the terrace's own floor
+local TERRACE_RISE = 10     -- a terrace's floor may be this far above or below the village's
 local SCAFFOLD = "default:fence_wood"
 local INVITE_STANDING = 10  -- standing needed to invite a settler into an empty bed
 local VILLAGE_REACH = 96    -- how far from its middle a village's beds may be
@@ -292,13 +297,14 @@ local function class_of(cid)
 	return c
 end
 
--- The ground a new house could stand on: the surface of each column, if it
--- is open sky above natural ground near the village floor.
+-- The ground a new house could stand on: the surface height of each
+-- column, if it is open sky above natural ground within reach of the
+-- village floor (a terrace's reach, so find_plot can look up and down).
 local function ground_reader(rec, palette)
 	local floor_y = rec.y
 	local r = SEARCH_MAX + 24
-	local minp = {x = rec.x - r, y = floor_y - 8, z = rec.z - r}
-	local maxp = {x = rec.x + r, y = floor_y + 16, z = rec.z + r}
+	local minp = {x = rec.x - r, y = floor_y - TERRACE_RISE - TERRACE_SLACK - 2, z = rec.z - r}
+	local maxp = {x = rec.x + r, y = floor_y + TERRACE_RISE + TERRACE_SLACK + 16, z = rec.z + r}
 	local vm = minetest.get_voxel_manip()
 	local emin, emax = vm:read_from_map(minp, maxp)
 	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
@@ -316,8 +322,8 @@ local function ground_reader(rec, palette)
 			for y = maxp.y, minp.y, -1 do
 				local c = class_of(data[area:index(x, y, z)])
 				if c ~= "clear" then
-					if c:sub(1, 6) == "solid:" and math.abs(y - floor_y) <= LEVEL_SLACK
-							and c:sub(7) ~= path then
+					-- solid at the very top of the window is buried, not open
+					if y < maxp.y and c:sub(1, 6) == "solid:" and c:sub(7) ~= path then
 						hit = y
 					end
 					break
@@ -359,39 +365,66 @@ local function find_plot(rec, key, palette)
 	local ground = ground_reader(rec, palette)
 	local spin = pr:next(0, 6283) / 1000
 
-	for r = SEARCH_MIN, SEARCH_MAX, 3 do
-		local n = math.max(12, math.floor(2 * math.pi * r / 6))
-		for i = 0, n - 1 do
-			local a = spin + i * 2 * math.pi / n
-			local cx = rec.x + math.floor(math.cos(a) * r + 0.5)
-			local cz = rec.z + math.floor(math.sin(a) * r + 0.5)
-			local minx = cx - math.floor((ext_x - 1) / 2)
-			local minz = cz - math.floor((ext_z - 1) / 2)
-			local ok = true
-			for x = minx - MARGIN, minx + ext_x - 1 + MARGIN do
-				for z = minz - MARGIN, minz + ext_z - 1 + MARGIN do
-					if not ground(x, z) then
-						ok = false
-						break
-					end
-				end
-				if not ok then
-					break
+	-- Every column of the plot and its margin within `slack` of `floor`?
+	local function level_at(minx, minz, floor, slack)
+		for x = minx - MARGIN, minx + ext_x - 1 + MARGIN do
+			for z = minz - MARGIN, minz + ext_z - 1 + MARGIN do
+				local h = ground(x, z)
+				if not h or math.abs(h - floor) > slack then
+					return false
 				end
 			end
-			if ok and not minetest.is_protected({x = cx, y = rec.y, z = cz}, "") then
-				local below = math.max(0, -(palette.offset or 0))
-				return {
-					file = file, rot = rot,
-					minx = minx, minz = minz, ext_x = ext_x, ext_z = ext_z,
-					size = {x = schem.size.x, y = schem.size.y, z = schem.size.z},
-					floor_y = rec.y, base_y = rec.y + (palette.offset or 0),
-					below = below,
-				}
+		end
+		return true
+	end
+
+	-- Walk the rings outwards; floor_for(cx, cz, minx, minz) says what floor
+	-- a plot centred there would have, or nil if it cannot be had.
+	local function search(floor_for)
+		for r = SEARCH_MIN, SEARCH_MAX, 3 do
+			local n = math.max(12, math.floor(2 * math.pi * r / 6))
+			for i = 0, n - 1 do
+				local a = spin + i * 2 * math.pi / n
+				local cx = rec.x + math.floor(math.cos(a) * r + 0.5)
+				local cz = rec.z + math.floor(math.sin(a) * r + 0.5)
+				local minx = cx - math.floor((ext_x - 1) / 2)
+				local minz = cz - math.floor((ext_z - 1) / 2)
+				local floor = floor_for(cx, cz, minx, minz)
+				if floor and not minetest.is_protected({x = cx, y = floor, z = cz}, "") then
+					return minx, minz, floor
+				end
 			end
 		end
 	end
-	return nil, "no_room"
+
+	-- level with the village, as close as there is room...
+	local minx, minz, floor = search(function(_, _, mx, mz)
+		return level_at(mx, mz, rec.y, LEVEL_SLACK) and rec.y or nil
+	end)
+	-- ...and failing that, a terrace on higher or lower ground nearby, at
+	-- the height of its own middle
+	local terrace = false
+	if not minx then
+		minx, minz, floor = search(function(cx, cz, mx, mz)
+			local h = ground(cx, cz)
+			if h and math.abs(h - rec.y) <= TERRACE_RISE
+					and level_at(mx, mz, h, TERRACE_SLACK) then
+				return h
+			end
+		end)
+		terrace = minx ~= nil
+	end
+	if not minx then
+		return nil, "no_room"
+	end
+	return {
+		file = file, rot = rot,
+		minx = minx, minz = minz, ext_x = ext_x, ext_z = ext_z,
+		size = {x = schem.size.x, y = schem.size.y, z = schem.size.z},
+		floor_y = floor, base_y = floor + (palette.offset or 0),
+		below = math.max(0, -(palette.offset or 0)),
+		terrace = terrace or nil,
+	}
 end
 
 lualore.commissions.find_plot = find_plot
@@ -404,7 +437,9 @@ local function centre_of(c)
 		z = c.minz + math.floor(c.ext_z / 2)}
 end
 
--- Level the plot and the ring of ground round it to the village floor.
+-- Level the plot and the ring of ground round it to the plot's floor: the
+-- village floor, or a terrace's own. Ground above it is cut away, hollows
+-- below it filled.
 local function level_plot(c)
 	local fy = c.floor_y
 	local top = minetest.get_node({x = c.minx, y = fy, z = c.minz}).name
@@ -420,6 +455,7 @@ local function level_plot(c)
 					minetest.remove_node(p)
 				end
 			end
+			-- ground is at most TERRACE_SLACK below, so at most 3 rows to fill
 			for y = fy - 3, fy - 1 do
 				local p = {x = x, y = y, z = z}
 				if minetest.get_node(p).name == "air" then
