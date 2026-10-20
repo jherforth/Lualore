@@ -573,6 +573,17 @@ local function register_villager(class_name, class_def, biome_name, biome_config
 			return true
 		end,
 
+		-- mobs_redo calls do_punch every time the mob is hit. It never calls
+		-- a mob's on_punch (below): register_mob does not copy that field.
+		do_punch = function(self, hitter)
+			-- The village's guardians saw the blow (wooden_guardian.lua).
+			-- Raiders and hostiles have no guardian.
+			if hitter and hitter:is_player() and lualore.guardian
+					and lualore.guardian.is_protected(self) then
+				lualore.guardian.alert(self.object:get_pos(), hitter)
+			end
+		end,
+
 		on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir)
 			minetest.log("action", "[lualore] on_punch called")
 
@@ -587,12 +598,6 @@ local function register_villager(class_name, class_def, biome_name, biome_config
 			-- attack. Same code path as sneak + right-click.
 			if try_trade(self, hitter) then
 				return
-			end
-
-			-- Anything else is a blow, and the village's guardians saw it
-			-- (wooden_guardian.lua). Raiders and hostiles have no guardian.
-			if lualore.guardian and lualore.guardian.is_protected(self) then
-				lualore.guardian.alert(self.object:get_pos(), hitter)
 			end
 
 			-- DEFENSIVE BEHAVIOR: If this is an NPC being attacked (not a trade), fight back!

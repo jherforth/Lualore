@@ -5,7 +5,9 @@
 -- Every village gets one (village_workstations.lua places it), and a
 -- player can wake another: stand four logs of any wood in a T, two
 -- stacked with one either side of the upper, and set a Guardian Heart on
--- top. The model and texture come from tools/make_wooden_guardian.py;
+-- top. The heart is crafted (8 planks round a mese crystal), or forged by
+-- throwing a crystal into a ring of 8 planks on the ground (see the end of
+-- this file). The model and texture come from tools/make_wooden_guardian.py;
 -- WOODEN_GUARDIAN.md has the player's view.
 --
 -- What it does:
@@ -90,7 +92,7 @@ local function anger(ent, player)
 end
 
 -- A player struck a villager at pos: every guardian in range comes for
--- them. Called from the villager on_punch.
+-- them. Called from the villager do_punch.
 function lualore.guardian.alert(pos, player)
 	if not (pos and player and player:is_player()) then
 		return 0
@@ -231,6 +233,13 @@ end
 -- ------------------------------------------------------------------
 -- Repair
 -- ------------------------------------------------------------------
+-- mobs_redo keeps the maximum on the object's properties (scaled by the
+-- server's mob difficulty), not on the entity.
+local function max_hp(self)
+	local prop = self.prop or (self.object and self.object:get_properties())
+	return prop and prop.hp_max or 150
+end
+
 local function repair(self, clicker)
 	local stack = clicker:get_wielded_item()
 	local item = stack:get_name()
@@ -243,7 +252,7 @@ local function repair(self, clicker)
 	if not heal then
 		return false
 	end
-	local max = self.hp_max or 150
+	local max = max_hp(self)
 	if (self.health or 0) >= max then
 		minetest.chat_send_player(clicker:get_player_name(),
 			S("The guardian is already whole."))
@@ -347,9 +356,9 @@ mobs:register_mob(NAME, {
 		end
 		local who = self._builder
 		local msg = who and S("Wooden Guardian, woken by @1. Health @2 of @3.",
-				who, math.floor(self.health or 0), self.hp_max or 150)
+				who, math.floor(self.health or 0), max_hp(self))
 			or S("Wooden Guardian of the village. Health @1 of @2.",
-				math.floor(self.health or 0), self.hp_max or 150)
+				math.floor(self.health or 0), max_hp(self))
 		minetest.chat_send_player(clicker:get_player_name(), msg)
 	end,
 
@@ -510,3 +519,106 @@ minetest.register_craft({
 		{"group:wood", "group:wood", "group:wood"},
 	},
 })
+
+-- ------------------------------------------------------------------
+-- Forging a heart in the world
+-- ------------------------------------------------------------------
+-- The same recipe, laid out on the ground: a ring of eight planks round
+-- an empty middle, and a mese crystal thrown into the hole. The planks
+-- are used up and the heart pops out of the hole. Watched for the way the
+-- sky portal watches for its iron ingot (portal/sky_portal.lua).
+local CRYSTAL = "default:mese_crystal"
+local FORGE_RADIUS = 10
+local FORGE_EVERY = 0.5
+
+local function is_plank(pos)
+	return minetest.get_item_group(minetest.get_node(pos).name, "wood") > 0
+end
+
+-- The eight planks round hole, or nil.
+function lualore.guardian.find_ring(hole)
+	if minetest.get_node(hole).name ~= "air" then
+		return nil
+	end
+	local ring = {}
+	for dx = -1, 1 do
+		for dz = -1, 1 do
+			if dx ~= 0 or dz ~= 0 then
+				local p = {x = hole.x + dx, y = hole.y, z = hole.z + dz}
+				if not is_plank(p) then
+					return nil
+				end
+				ring[#ring + 1] = p
+			end
+		end
+	end
+	return ring
+end
+
+local function forge(hole, obj, stack, player_name)
+	local ring = lualore.guardian.find_ring(hole)
+	if not ring then
+		return false
+	end
+	if minetest.is_protected(hole, player_name) then
+		minetest.record_protection_violation(hole, player_name)
+		return false
+	end
+	local pos = obj:get_pos()
+	obj:remove()
+	if stack:get_count() > 1 then -- one crystal is enough; return the rest
+		stack:take_item(1)
+		minetest.add_item(pos, stack)
+	end
+	for _, p in ipairs(ring) do
+		minetest.remove_node(p)
+	end
+	local heart = minetest.add_item({x = hole.x, y = hole.y + 0.2, z = hole.z}, HEART)
+	if heart then
+		heart:set_velocity({x = 0, y = 3, z = 0})
+	end
+	minetest.add_particlespawner({
+		amount = 40, time = 0.5,
+		minpos = {x = hole.x - 1.4, y = hole.y - 0.4, z = hole.z - 1.4},
+		maxpos = {x = hole.x + 1.4, y = hole.y + 0.6, z = hole.z + 1.4},
+		minvel = {x = -0.5, y = 1, z = -0.5}, maxvel = {x = 0.5, y = 2.5, z = 0.5},
+		minexptime = 0.6, maxexptime = 1.2, minsize = 1, maxsize = 2.5,
+		texture = "default_wood.png",
+	})
+	minetest.sound_play("default_place_node", {pos = hole, gain = 1.0}, true)
+	minetest.log("action", "[lualore] " .. player_name .. " forged a Guardian Heart at "
+		.. minetest.pos_to_string(hole))
+	return true
+end
+
+local function check_dropped_crystals(player)
+	local name = player:get_player_name()
+	for _, obj in ipairs(minetest.get_objects_inside_radius(player:get_pos(), FORGE_RADIUS)) do
+		local ent = obj:get_luaentity()
+		if ent and ent.name == "__builtin:item" and type(ent.itemstring) == "string" then
+			local stack = ItemStack(ent.itemstring)
+			local pos = stack:get_name() == CRYSTAL and obj:get_pos()
+			if pos then
+				local p = vector.round(pos)
+				local h = minetest.hash_node_position(p)
+				-- only look again once the crystal has moved to a new cell
+				if ent._lualore_forge_seen ~= h then
+					ent._lualore_forge_seen = h
+					forge(p, obj, stack, name)
+				end
+			end
+		end
+	end
+end
+
+local forge_timer = 0
+minetest.register_globalstep(function(dtime)
+	forge_timer = forge_timer + dtime
+	if forge_timer < FORGE_EVERY then
+		return
+	end
+	forge_timer = 0
+	for _, player in ipairs(minetest.get_connected_players()) do
+		check_dropped_crystals(player)
+	end
+end)
