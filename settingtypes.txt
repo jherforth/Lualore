@@ -235,3 +235,8 @@ lualore_commission_cost (Commission cost growth) float 0.25 0.0 2.0
 # Give every village a Wooden Guardian that patrols it and fights
 # monsters. Players can still build their own when this is off.
 lualore_village_guardians (Village guardians) bool true
+
+# Seconds a village waits between guardians raised by frightened villagers.
+# A frightened villager with no guardian within 32 nodes raises one; kill
+# it while the villager is still frightened and another rises after this.
+lualore_guardian_summon_cooldown (Guardian summon cooldown) int 30 5 600

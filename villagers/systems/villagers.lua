@@ -325,11 +325,27 @@ end
 local function register_villager(class_name, class_def, biome_name, biome_config)
 	local mob_name = "lualore:" .. biome_name .. "_" .. class_name
 
+	-- A frightened villager calls the guardians, or raises one, and runs
+	-- from what frightened it (wooden_guardian.lua). True while running:
+	-- do_custom then returns false so nothing else steers it that step.
+	local function frightened(self, dtime)
+		if not (lualore.guardian and lualore.guardian.villager_step) then
+			return false
+		end
+		local ok, fleeing = pcall(lualore.guardian.villager_step, self, dtime)
+		if not ok then
+			minetest.log("warning", "[lualore] villager_step error: " .. tostring(fleeing))
+			return false
+		end
+		return fleeing
+	end
+
 	-- Determine which do_custom function to use
 	local custom_function
 	if class_name == "witch" then
 		-- Witches use magic-based custom function
 		custom_function = function(self, dtime)
+			frightened(self, dtime) -- she calls for help, but never runs
 			if lualore.witch_magic then
 				lualore.witch_magic.do_custom(self, dtime)
 			end
@@ -339,6 +355,9 @@ local function register_villager(class_name, class_def, biome_name, biome_config
 		-- class has one. Classes with no entry in lualore.jobs.classes
 		-- (hostile, raider) get a nil job_def and an unchanged tick.
 		custom_function = function(self, dtime)
+			if frightened(self, dtime) then
+				return false
+			end
 			-- Wrap in error handler to prevent crashes
 			local success, err = pcall(function()
 				-- Update mood system
@@ -576,8 +595,16 @@ local function register_villager(class_name, class_def, biome_name, biome_config
 		-- mobs_redo calls do_punch every time the mob is hit. It never calls
 		-- a mob's on_punch (below): register_mob does not copy that field.
 		do_punch = function(self, hitter)
-			-- The village's guardians saw the blow (wooden_guardian.lua).
-			-- Raiders and hostiles have no guardian.
+			-- A blow frightens it for a while (wooden_guardian.lua), and a
+			-- guardian it raises remembers who struck.
+			local t = minetest.get_gametime()
+			self._lualore_hurt = t
+			if hitter and hitter:is_player() then
+				self._lualore_hurt_by = hitter:get_player_name()
+				self._lualore_hurt_by_at = t
+			end
+			-- The village's guardians saw the blow. Raiders and hostiles
+			-- have no guardian.
 			if hitter and hitter:is_player() and lualore.guardian
 					and lualore.guardian.is_protected(self) then
 				lualore.guardian.alert(self.object:get_pos(), hitter)
