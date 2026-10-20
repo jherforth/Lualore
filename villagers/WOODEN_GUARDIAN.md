@@ -13,8 +13,12 @@ knotted fists, and two amber knot-eyes in a carved face.
   in one (needs the `server` privilege). It adds a guardian only if none is
   about, so running it twice never gives you two.
 - **You can wake your own**, from any kind of wood:
-  1. Craft a **Guardian Heart**: eight planks of any wood round a mese
-     crystal.
+  1. Make a **Guardian Heart**, in one of two ways:
+     - **In the world:** lay eight planks of any wood on the ground in a
+       ring round an empty middle, and throw a mese crystal into the hole
+       (drop it with Q). The planks are used up and the heart pops out of
+       the hole.
+     - **In the crafting grid:** eight planks round a mese crystal.
 
      ```
      planks  planks  planks
@@ -76,6 +80,12 @@ A spawn egg, *Wooden Guardian*, is in the creative inventory for testing.
 - `near(pos, r)`: whether a guardian is within `r` of `pos`.
 - `find_t(pos)`: the five nodes of a valid T with the heart at `pos`, or
   nil.
+- `find_ring(pos)`: the eight planks of a forging ring round the empty
+  `pos`, or nil.
+
+Villagers alert the guardians from their `do_punch`. mobs_redo never calls
+a mob definition's `on_punch`, because `register_mob` doesn't copy that
+field.
 
 The model and textures come from `tools/make_wooden_guardian.py`. Run it
 from the mod root, and add `--preview DIR` to render front and side views
