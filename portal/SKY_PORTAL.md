@@ -188,10 +188,19 @@ there:
     top, and if there's no such cave it digs the castle into the rock. It
     is built by the normal castle builder: crypt, abandoned village, and
     four wizards around the statue.
-- **Arrival:** you step out on open floor near the castle, through a dark
-  portal of its own, crowned with a crystal, linked back to the one you
-  came through. If the castle has no open floor, a landing is hollowed out
-  beside it.
+- **Arrival:** you step out **on top of the castle**, through a dark portal
+  of its own that leads back to the one you came through. It stands on the
+  highest part of the roof where a frame fits, as near the middle as it
+  can. If the cave is too low over the castle for that, a small obsidian
+  landing is laid on the roof's highest point and the rock above it is
+  cleared. (Only if the castle has no roof to find at all does it land on
+  the floor beside the castle.)
+- **The way home:** the castle's portal is dark because of where it
+  stands, so it needs no crystal on its roof and always leads back. Every
+  dark portal gets its own castle portal, even when several of them lead
+  to the same castle, and each one takes you back to where you came from.
+  Castle portals made before this, which turned blue and lost their way
+  home, mend themselves the next time someone steps in.
 - **The wizards:** a castle whose wizards are all gone **gathers a new
   group** a few seconds after someone arrives, at most once an hour per
   castle. That way the trip is always a fight, without becoming a farm for

@@ -454,6 +454,37 @@ local function forget(key)
 	save_records()
 end
 
+-- The far end of a dark portal, at a wizard castle, is dark because of
+-- where it stands, not because of a crystal on its roof. It used to wear a
+-- crystal, set only if the cell above the frame was air; in a cave that is
+-- usually rock, so the castle end came uncrowned, turned blue the first
+-- time anyone stepped back in, and forgot its way home.
+local function castle_end(frame)
+	local rec = records[key_of(frame)]
+	return rec ~= nil and rec.castle ~= nil
+end
+
+local function wants_dark(frame)
+	return crowned(frame) or castle_end(frame)
+end
+
+-- A castle end always leads back. One that lost its link (as above) finds
+-- the portal that leads to it again.
+local function heal_castle_end(key)
+	local rec = records[key]
+	if not (rec and rec.castle) or (rec.link and records[rec.link]) then
+		return
+	end
+	for other, r in pairs(records) do
+		if other ~= key and r.link == key then
+			rec.link = other
+			rec.dark = true
+			save_records()
+			return
+		end
+	end
+end
+
 local function nearest_record(target, sky, radius, except)
 	local best, best_key, best_d
 	for key, rec in pairs(records) do
@@ -506,7 +537,7 @@ local function ignite(frame, obj, stack, player_name)
 		stack:take_item(1)
 		minetest.add_item(pos, stack)
 	end
-	frame.dark = crowned(frame)
+	frame.dark = wants_dark(frame)
 	light(frame, frame.dark)
 	local key = remember(frame)
 	swirl(frame, 40 + frame.w * frame.h)
@@ -718,14 +749,9 @@ local function build(frame)
 		end
 	end
 	minetest.bulk_set_node(mese, {name = FRAME})
+	-- A castle end is dark without a crystal (castle_end above); giving it
+	-- one would hand out a free crystal to anyone who dug it off.
 	light(frame, frame.dark)
-	if frame.dark then
-		-- the castle end wears its crystal too
-		local top = cell(frame.anchor, frame.axis, math.floor((frame.w - 1) / 2), frame.h + 1)
-		if node_name(top) == "air" then
-			minetest.set_node(top, {name = "everness:crystal_purple"})
-		end
-	end
 end
 
 -- ------------------------------------------------------------------
@@ -1050,8 +1076,79 @@ local function found_castle(cc, column, done)
 		end)
 end
 
+-- The castle end stands on the castle's roof. Read from the world, not the
+-- schematic: the highest ground on the castle where a frame fits, nearest
+-- the middle. Only ground at least ROOF_ABOVE over the plaza counts, so the
+-- courtyard round the castle is never taken for its roof. Returns the
+-- frame, or nil plus the roof height at the middle for a landing to be
+-- laid on.
+local ROOF_ABOVE = 3
+
+local function roof_spot(b, floor, protected_by)
+	local minp = {x = b.minx - 2, y = floor + ROOF_ABOVE, z = b.minz - 2}
+	local maxp = {x = b.maxx + 2, y = b.maxy + NEW_H + 3, z = b.maxz + 2}
+	local vm = minetest.get_voxel_manip()
+	local emin, emax = vm:read_from_map(minp, maxp)
+	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
+	local data = vm:get_data()
+	local function get(x, y, z)
+		if x < emin.x or x > emax.x or y < emin.y or y > emax.y
+				or z < emin.z or z > emax.z then
+			return "other"
+		end
+		return class_of(data[area:index(x, y, z)])
+	end
+	-- the highest ground in a column with open space over it: the roof
+	-- there (a cave ceiling above has air under it, not over it)
+	local function top_of(x, z)
+		for y = maxp.y - 1, minp.y, -1 do
+			if get(x, y, z) == "solid" and get(x, y + 1, z) == "clear" then
+				return y
+			end
+		end
+		return nil
+	end
+	local cx = math.floor((b.minx + b.maxx) / 2)
+	local cz = math.floor((b.minz + b.maxz) / 2)
+	local best, best_score
+	for x = b.minx, b.maxx do
+		for z = b.minz, b.maxz do
+			local y = top_of(x, z)
+			if y then
+				for _, axis in ipairs({"x", "z"}) do
+					if fits(get, x, y, z, axis) then
+						local score = (maxp.y - y) * 10000 + (x - cx) ^ 2 + (z - cz) ^ 2
+						local anchor = {x = x, y = y + 1, z = z}
+						if (not best_score or score < best_score)
+								and not minetest.is_protected(anchor, protected_by) then
+							best_score = score
+							best = {anchor = anchor, axis = axis, w = NEW_W, h = NEW_H,
+								ground = true}
+						end
+					end
+				end
+			end
+		end
+	end
+	if best then
+		return best, minp, maxp
+	end
+	-- the roof is too broken up for a frame: lay a landing on its highest
+	-- point near the middle
+	local high
+	for x = cx - 3, cx + 3 do
+		for z = cz - 3, cz + 3 do
+			local y = top_of(x, z)
+			if y and (not high or y > high) then
+				high = y
+			end
+		end
+	end
+	return nil, minp, maxp, high
+end
+
 -- Where a dark portal leads: the nearest wizard castle, or a new one.
--- The far end is a dark portal of its own, crowned, at the castle.
+-- The far end is a dark portal of its own, on the castle's roof.
 to_castle = function(column, ctx, settle, done)
 	local cc = lualore.cave_castle
 	if not (cc and cc.get_records and cc.find_floor and lualore.place_cave_castle) then
@@ -1063,14 +1160,35 @@ to_castle = function(column, ctx, settle, done)
 			return done(nil)
 		end
 		local floor = castle.y + plaza
-		local target = {x = castle.x, y = floor, z = castle.z}
-		search(target, true, true, ctx.name, function(frame, minp, maxp)
+		local b = cc.castle_bounds and cc.castle_bounds(
+			{x = castle.x, y = castle.y, z = castle.z}, castle.rot)
+		local function beside()
+			-- no roof to stand on: open floor about the castle, as before
+			local target = {x = castle.x, y = floor, z = castle.z}
+			search(target, true, true, ctx.name, function(frame, minp, maxp)
+				if not frame then
+					-- no open floor about the castle: hollow out a landing beside it
+					local side = {x = (b and b.maxx or castle.x + 20) + 6, y = floor, z = castle.z}
+					frame = platform_at(side, true, minp, maxp)
+				end
+				frame.dark = true
+				return settle(frame, nil, castle_key)
+			end)
+		end
+		if not (b and b.maxy) then
+			return beside()
+		end
+		-- on the roof
+		local minp = {x = b.minx - 2, y = floor, z = b.minz - 2}
+		local maxp = {x = b.maxx + 2, y = b.maxy + NEW_H + 3, z = b.maxz + 2}
+		emerge_then(minp, maxp, function()
+			local frame, rminp, rmaxp, high = roof_spot(b, floor, ctx.name)
+			if not frame and high then
+				frame = platform_at({x = math.floor((b.minx + b.maxx) / 2), y = high + 1,
+					z = math.floor((b.minz + b.maxz) / 2)}, true, rminp, rmaxp)
+			end
 			if not frame then
-				-- no open floor about the castle: hollow out a landing beside it
-				local b = cc.castle_bounds and cc.castle_bounds(
-					{x = castle.x, y = castle.y, z = castle.z}, castle.rot)
-				local side = {x = (b and b.maxx or castle.x + 20) + 6, y = floor, z = castle.z}
-				frame = platform_at(side, true, minp, maxp)
+				return beside()
 			end
 			frame.dark = true
 			return settle(frame, nil, castle_key)
@@ -1271,7 +1389,7 @@ end
 -- black (or blue) at once. It now leads somewhere else, so this end forgets
 -- its link and finds its new far end on the next trip.
 local function sync_crown(frame, node)
-	local dark = crowned(frame)
+	local dark = wants_dark(frame)
 	if dark == (node.name == DARK) then
 		return false
 	end
@@ -1321,8 +1439,9 @@ local function depart(player, portal_pos)
 	-- crowned or uncrowned since it was lit, by something that did not
 	-- tell us (WorldEdit, another mod): catch up now
 	sync_crown(frame, node)
-	frame.dark = crowned(frame)
+	frame.dark = wants_dark(frame)
 	local key = remember(frame)
+	heal_castle_end(key)
 	t.busy = true
 	if not records[key].link then
 		minetest.chat_send_player(name, records[key].dark
@@ -1466,8 +1585,9 @@ local function depart_mob(obj, ent, portal_pos)
 		return
 	end
 	sync_crown(frame, node)
-	frame.dark = crowned(frame)
+	frame.dark = wants_dark(frame)
 	local key = remember(frame)
+	heal_castle_end(key)
 	if not records[key].link then
 		t.must_leave = true -- a mob never opens a new way
 		return
