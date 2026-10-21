@@ -123,9 +123,9 @@ lualore_portal_delay (Sky portal delay) float 2.0 0.0 10.0
 # Only through a portal a player has already opened.
 lualore_portal_mobs (Mobs use sky portals) bool true
 
-# Ruined portals: about a quarter of the ruins are dead sky and dark
-# portals, as a hint of what can be built. Mostly Cracked Mese, with gaps;
-# some have a chest of iron ingots. See portal/SKY_PORTAL.md.
+# Ruined portals: three ruins in four have a dead sky or dark portal
+# beside them, as a hint of what can be built. Mostly Cracked Mese, with
+# gaps; some have a chest of iron ingots. See portal/SKY_PORTAL.md.
 lualore_portal_ruins (Ruined portals) bool true
 
 # Height from which a portal counts as being in the sky: portals at or

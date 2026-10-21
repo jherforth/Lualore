@@ -10,15 +10,30 @@ naturally, sections have collapsed, and the structures follow the terrain.
 
 | Type | Weight | Description |
 | --- | --- | --- |
-| `portal` | 25% | A **ruined sky or dark portal**: a frame of mostly Cracked Mese with gaps, plain or on a grand broken platform, sometimes with a chest of iron ingots. Built by `portal/portal_ruins.lua`; see `portal/SKY_PORTAL.md`, section 5b. Off with `lualore_portal_ruins`. |
-| `castle` | 30% | 19–27 node square: outer walls with a 2-cell gate (flanked by taller pillars), 3×3 corner tower ruins, a 5×5 inner keep (larger castles), courtyard flagstones, interior rubble and thinning rubble fields outside the walls. Always contains a chest when chests are enabled. |
-| `tower` | 23% | 7×7/9×9 hollow tower ruin, 4–9 nodes tall with a heavily crumbled crown, rubble at the base. 35% chest chance. |
-| `walls` | 13% | A 12–20 node wall fragment with taller broken ends, following the terrain. 10% chest chance. |
-| `stones` | 9% | A ring of 8–14 standing stones (some fallen) around an altar stone that is sometimes a glowing lamp. 25% chest chance, placed beside the altar. |
+| `castle` | 40% | 19–27 node square: outer walls with a 2-cell gate (flanked by taller pillars), 3×3 corner tower ruins, a 5×5 inner keep (larger castles), courtyard flagstones, interior rubble and thinning rubble fields outside the walls. Always contains a chest when chests are enabled. |
+| `tower` | 30% | 7×7/9×9 hollow tower ruin, 4–9 nodes tall with a heavily crumbled crown, rubble at the base. 35% chest chance. |
+| `walls` | 18% | A 12–20 node wall fragment with taller broken ends, following the terrain. 10% chest chance. |
+| `stones` | 12% | A ring of 8–14 standing stones (some fallen) around an altar stone that is sometimes a glowing lamp. 25% chest chance, placed beside the altar. |
 
 If the chosen type does not fit the local terrain, the placer automatically
-tries the next type down the table before giving up on the spot. A site a
-portal won't take (water, a slope, a village) gets an ordinary ruin.
+tries the next type down the table before giving up on the spot.
+
+### Ruined portals beside the ruins
+
+**Three ruins in four** of every kind have a **ruined sky or dark portal**
+standing beside them. It's a frame of mostly Cracked Mese with gaps, plain
+or on a grand broken platform, sometimes with a chest of iron ingots. It's
+built by `portal/portal_ruins.lua`; see `portal/SKY_PORTAL.md`, section 5b.
+
+- **Where it stands:** on a ring round the ruin, clear of everything the ruin
+  placed, at the first of 8 spots where the ground takes it. It looks well
+  below the ruin's base, which can be a tree canopy.
+- **Unloaded land:** if the land round the ruin isn't generated yet, it tries
+  again a few seconds later.
+- **When it can't:** a ruin that can't fit one logs
+  `No room for a ruined portal beside the ...` with the reasons.
+- **Building one alone:** `/spawn_ruin portal`.
+- **Turning it off:** `lualore_portal_ruins = false`.
 
 ## How placement works
 

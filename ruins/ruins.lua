@@ -854,9 +854,10 @@ local function gen_stones(ctx)
 	return true
 end
 
--- "portal" is a ruined sky or dark portal (portal/portal_ruins.lua), which
--- builds itself; it comes first, so a site it does not fit falls through
--- to an ordinary ruin.
+-- "portal" is a ruined sky or dark portal on its own (portal/portal_ruins.lua);
+-- it is only built when asked for (/spawn_ruin portal). Ruins of every
+-- other kind get one beside them PORTAL_SHARE percent of the time
+-- (attach_portal, below).
 local TYPE_ORDER = {"portal", "castle", "tower", "walls", "stones"}
 local TYPE_INDEX = {portal = 1, castle = 2, tower = 3, walls = 4, stones = 5}
 local TYPE_NAME = {
@@ -873,19 +874,82 @@ local function portals_enabled()
 		and lualore.portal_ruins.enabled ~= false
 end
 
--- a quarter portals, then the old mix of the rest
 local function pick_type(pr)
 	local r = pr:next(1, 100)
-	if r <= 25 then
-		return portals_enabled() and 1 or 2
-	elseif r <= 55 then
+	if r <= 40 then
 		return 2
-	elseif r <= 78 then
+	elseif r <= 70 then
 		return 3
-	elseif r <= 91 then
+	elseif r <= 88 then
 		return 4
 	end
 	return 5
+end
+
+-- ------------------------------------------------------------------
+-- A ruined portal beside the ruin
+-- ------------------------------------------------------------------
+-- Most ruins have a dead portal standing near them: the hint at what can
+-- be built. It goes on a ring round the ruin, clear of everything the ruin
+-- placed (a portal's footprint reaches about 7 nodes from its middle), at
+-- the first of 8 spots round the ring where the ground will take it. Each
+-- spot looks well below the ruin's base for ground, since the base can be
+-- a tree canopy. If the land round the ruin is not all generated yet, it
+-- tries again a little later.
+local PORTAL_SHARE = 75     -- percent of ruins with a ruined portal
+local PORTAL_REACH = 7      -- how far a portal ruin's footprint spreads
+local PORTAL_TRIES = 10     -- later attempts while land is still missing
+
+local function plan_box(plan)
+	local b = {minx = math.huge, maxx = -math.huge, minz = math.huge, maxz = -math.huge}
+	for _, n in ipairs(plan) do
+		b.minx, b.maxx = math.min(b.minx, n.x), math.max(b.maxx, n.x)
+		b.minz, b.maxz = math.min(b.minz, n.z), math.max(b.maxz, n.z)
+	end
+	return b
+end
+
+local function attach_portal(kind, box, base, seed, tries_left)
+	local pr = PcgRandom(seed + 4243)
+	local cx, cz = (box.minx + box.maxx) / 2, (box.minz + box.maxz) / 2
+	local half = math.max(box.maxx - box.minx, box.maxz - box.minz) / 2
+	-- a ring whose spots clear the ruin's box by a node or two at any angle:
+	-- both boxes are squares, so both diagonals count
+	local r = (half + PORTAL_REACH) * math.sqrt(2) + 1
+	local start = pr:next(0, 359)
+	local reasons, missing_land = {}, false
+	for k = 0, 7 do
+		local a = math.rad(start + k * 45)
+		local x = math.floor(cx + math.cos(a) * r + 0.5)
+		local z = math.floor(cz + math.sin(a) * r + 0.5)
+		local plan, why = lualore.portal_ruins.build_at(x, z, seed + k * 131, nil,
+			base + 10, base - 24)
+		if plan then
+			return plan
+		end
+		reasons[#reasons + 1] = tostring(why)
+		if why == "retry" then
+			missing_land = true
+		end
+	end
+	if missing_land and (tries_left or PORTAL_TRIES) > 0 then
+		minetest.after(3, attach_portal, kind, box, base, seed, (tries_left or PORTAL_TRIES) - 1)
+		return nil
+	end
+	minetest.log("action", string.format(
+		"[lualore] No room for a ruined portal beside the %s at %d,%d (%s)",
+		TYPE_NAME[kind] or kind, cx, cz, table.concat(reasons, ", ")))
+	return nil
+end
+
+local function maybe_attach_portal(kind, ctx, seed)
+	if not portals_enabled() or #ctx.plan == 0 then
+		return nil
+	end
+	if PcgRandom(seed + 9157):next(1, 100) > PORTAL_SHARE then
+		return nil
+	end
+	return attach_portal(kind, plan_box(ctx.plan), ctx.base, seed)
 end
 
 -- ------------------------------------------------------------------
@@ -1012,10 +1076,11 @@ local function build_ruin(cx, cz, theme, seed, force_type, scan_top, scan_bottom
 		ctx.invalid = false
 		local kind = TYPE_ORDER[idx]
 		if kind == "portal" then
-			-- it finds its own footing round the ground found here
+			-- it finds its own footing, looking well below the ground found
+			-- here (which can be a tree canopy)
 			if portals_enabled() then
 				local plan, why = lualore.portal_ruins.build_at(cx, cz, seed, nil,
-					base + 6, base - 6)
+					base + 10, base - 24)
 				if plan then
 					return true, kind, true, base
 				end
@@ -1029,7 +1094,9 @@ local function build_ruin(cx, cz, theme, seed, force_type, scan_top, scan_bottom
 				return "retry"
 			end
 			if result then
-				return true, kind, execute_plan(ctx), base
+				local built = execute_plan(ctx)
+				local portal = built and maybe_attach_portal(kind, ctx, seed) or nil
+				return true, kind, built, base, portal
 			end
 		end
 	end

@@ -23,12 +23,10 @@
 -- 1-3 real mese blocks, and some have a chest with iron ingots (what
 -- lights a portal) and a little more.
 --
--- They are one of the ruin types (ruins/ruins.lua), so they turn up as
--- often as the other ruins do: about a quarter of all ruins are portals.
--- A site the portal does not fit (water, a slope, a village) gets another
--- kind of ruin instead.
+-- Three ruins in four (ruins/ruins.lua) have one standing beside them, so
+-- they turn up wherever ruins do. /spawn_ruin portal builds one alone.
 --
--- Settings: lualore_portal_ruins (bool): whether ruins may be portals
+-- Settings: lualore_portal_ruins (bool): whether ruins get portals
 -- ===================================================================
 
 lualore = lualore or {}
