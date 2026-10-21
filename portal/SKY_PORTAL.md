@@ -228,20 +228,29 @@ built: a frame of the right shape, cracked and broken. **Three ruins in
 four** (`ruins/RUINS.md`) have one standing beside them, so you find them
 wherever you find ruins. They're on dry ground and never in a village.
 
-- **Two kinds.** Sky ruins are in weathered stone and mossy cobble. Dark
-  ruins are in obsidian, like the black portals to the wizard castles.
-  About 4 in 10 ruins are dark. Very rarely (one dark ruin in 8) a dark
-  ruin still wears its crystal on the roof.
+- **One kind of portal.** Very rarely (one ruin in 20) a ruin still
+  wears its crystal on the roof, a hint that a crystal turns a portal
+  dark. Otherwise there's nothing to tell a would-be sky portal from a
+  dark one.
 - **Two styles.**
-  - **Plain:** just the frame, sunk in the ground, with 2–4 blocks gone.
+  - **Plain:** just the frame, sunk in the ground on a stone foundation.
   - **Grand:** a larger frame (3 × 4 inside) on a worn platform between two
-    broken pillars, with 3–5 blocks gone.
-- **They never work.** Most of the frame is **Cracked Mese**: it looks
-  like mese but its power is spent. It drops only 1–3 mese fragments, and
-  no portal lights through it. Each ruin keeps 1–3 blocks of real mese. To
+    broken pillars, in weathered stone or (4 times in 10) obsidian.
+- **The ring is only mese.** Every block of it, corners too, is Cracked
+  Mese or real mese. The stone and obsidian are only round it, in the
+  platform, pillars and foundation.
+- **Broken the way a ring breaks, and nothing floats.** The roof has fallen
+  in, or one side has snapped off part way up with the roof hanging from
+  the other, or both, or there's a chip out of the roof. Every block left
+  still reaches the ground through the ring; anything that wouldn't is
+  gone. A crystal ruin keeps its roof whole under the crystal; only a post
+  is broken.
+- **They never work.** Most of the ring is **Cracked Mese**: it looks like
+  mese but its power is spent. It drops only 1–3 mese fragments, and no
+  portal lights through it. Each ruin keeps 1–3 blocks of real mese. To
   make one work, replace the cracked blocks and fill the gaps with real
-  mese, then throw in an iron ingot. The shape is already right. The
-  corners are stone, since a frame doesn't need them.
+  mese, then throw in an iron ingot. The shape is already right. Fallen
+  pieces lie on the ground nearby.
 - **Chests.** About half the ruins have a chest at the foot of the frame
   with 3–8 iron ingots (what lights a portal) and 2–5 mese fragments,
   sometimes with an obsidian shard or a few torches. It isn't filled with
@@ -302,7 +311,7 @@ and buffer bounds, and emits a single 4-second `idle` animation.
 | Command | Priv | Purpose |
 |---|---|---|
 | `/sky_portals [radius]` | — | Portals within the radius (default 128): ground or sky, size, position and where each one leads. |
-| `/spawn_portal_ruin [sky\|dark] [plain\|grand] [crystal]` | server | Raise a ruined portal a few nodes from you, for testing. |
+| `/spawn_portal_ruin [plain\|grand] [stone\|obsidian] [crystal]` | server | Raise a ruined portal a few nodes from you, for testing. |
 | `/find_portal_ruin` | server | The nearest recorded ruined portal. |
 
 ## 9. What happened to the obsidian doors

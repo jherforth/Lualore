@@ -4,24 +4,26 @@
 -- ===================================================================
 -- Old portals stand here and there in the world, long dead: a mese frame
 -- of the right shape, but cracked and broken, so a player who finds one
--- learns what a portal looks like and what it needs. Two kinds:
+-- learns what a portal looks like and what it needs. There is one kind of
+-- portal; very rarely a ruin still wears its crystal on the roof, the
+-- hint that a crystal turns a portal dark.
 --
---   * sky ruins, in weathered stone, like the blue portals to the sky;
---   * dark ruins, in obsidian, like the black portals to the wizard
---     castles. Very rarely one still wears its crystal on the roof.
+-- Two styles:
 --
--- and two styles:
+--   * plain: just the frame, sunk in the ground on a stone foundation;
+--   * grand: a larger frame on a worn platform between two broken pillars,
+--     in weathered stone or obsidian.
 --
---   * plain: just the frame, sunk in the ground, a few blocks gone;
---   * grand: the frame on a stone platform between two broken pillars,
---     with more of it missing.
+-- The ring itself is only ever mese: mostly Cracked Mese, which looks like
+-- mese but has lost its power (it drops only fragments, and no portal is
+-- lit through it), with 1-3 blocks of real mese. To make one work, replace
+-- the cracked blocks and fill the gaps with real mese; the shape is already
+-- right. Some have a chest with iron ingots (what lights a portal).
 --
--- A ruin never works. Most of its frame is Cracked Mese, which looks like
--- mese but has lost its power: it drops only fragments, and no portal is
--- lit through it. To make one work, replace the cracked blocks and fill
--- the gaps with real mese; the shape is already right. Each ruin keeps
--- 1-3 real mese blocks, and some have a chest with iron ingots (what
--- lights a portal) and a little more.
+-- A ruin is broken the way a stone ring breaks: the roof fallen in, one
+-- side snapped off part way up with the roof hanging from the other, both,
+-- or a chip out of the roof. Whatever is left must still reach the ground
+-- through the ring, so nothing floats.
 --
 -- Three ruins in four (ruins/ruins.lua) have one standing beside them, so
 -- they turn up wherever ruins do. /spawn_ruin portal builds one alone.
@@ -43,9 +45,9 @@ local CRACKED = "lualore:cracked_mese"
 local CHEST = "default:chest"
 local CRYSTALS = {"everness:crystal_purple", "everness:crystal_orange", "everness:crystal_cyan"}
 
-local DARK_SHARE = 40       -- percent of ruins that are dark
-local GRAND_SHARE = 35      -- percent that are grand
-local CRYSTAL_ODDS = 8      -- one dark ruin in this many keeps its crystal
+local GRAND_SHARE = 35      -- percent of ruins that are grand
+local OBSIDIAN_SHARE = 40   -- percent built round in obsidian rather than stone
+local CRYSTAL_ODDS = 20     -- one ruin in this many still wears its crystal
 local CHEST_PLAIN, CHEST_GRAND = 40, 60 -- percent with a chest
 
 -- ------------------------------------------------------------------
@@ -69,7 +71,7 @@ minetest.register_node(CRACKED, {
 })
 
 -- ------------------------------------------------------------------
--- Themes
+-- What is built round the ring (never the ring itself)
 -- ------------------------------------------------------------------
 local function first_registered(list)
 	for _, name in ipairs(list) do
@@ -80,23 +82,21 @@ local function first_registered(list)
 	return list[#list]
 end
 
-local THEMES = {
-	sky = {
+local SETTINGS = {
+	stone = {
 		base = {"default:stonebrick", "default:cobble"},
 		accent = {"default:mossycobble", "default:cobble"},
 		floor = {"default:stonebrick", "default:cobble"},
-		corner = {"default:stonebrick", "default:cobble"},
 	},
-	dark = {
+	obsidian = {
 		base = {"default:obsidianbrick", "default:obsidian"},
 		accent = {"default:obsidian", "default:obsidianbrick"},
 		floor = {"default:obsidianbrick", "default:obsidian"},
-		corner = {"default:obsidian", "default:obsidianbrick"},
 	},
 }
 
-local function theme_node(kind, part)
-	return first_registered(THEMES[kind][part])
+local function setting_node(setting, part)
+	return first_registered(SETTINGS[setting][part])
 end
 
 -- ------------------------------------------------------------------
@@ -161,7 +161,7 @@ local function level_enough(x0, z0, x1, z1, gy, slack)
 end
 
 -- ------------------------------------------------------------------
--- Planning a ruin
+-- Breaking the ring
 -- ------------------------------------------------------------------
 -- frame cell (i, j) of a frame whose interior bottom-left is `a` along `axis`
 local function cell(a, axis, i, j, d)
@@ -172,34 +172,122 @@ local function cell(a, axis, i, j, d)
 	return {x = a.x + d, y = a.y + j, z = a.z + i}
 end
 
--- The frame cells of a w x h interior, split into sides and corners.
-local function frame_cells(w, h)
-	local sides, corners = {}, {}
+local function ck(i, j)
+	return i .. ":" .. j
+end
+
+-- Every cell of the ring round a w x h interior, corners included.
+local function ring_cells(w, h)
+	local out = {}
 	for i = -1, w do
 		for j = -1, h do
-			local edge_i, edge_j = i == -1 or i == w, j == -1 or j == h
-			if edge_i and edge_j then
-				corners[#corners + 1] = {i, j}
-			elseif edge_i or edge_j then
-				sides[#sides + 1] = {i, j}
+			if i == -1 or i == w or j == -1 or j == h then
+				out[#out + 1] = {i, j}
 			end
 		end
 	end
-	return sides, corners
+	return out
 end
 
-local function shuffle(pr, list)
-	for i = #list, 2, -1 do
-		local j = pr:next(1, i)
-		list[i], list[j] = list[j], list[i]
+local function is_corner(c, w, h)
+	return (c[1] == -1 or c[1] == w) and (c[2] == -1 or c[2] == h)
+end
+
+-- Decide which ring cells survive. Returns a set keyed by ck(i, j).
+-- `keep_roof_mid` (a crystal ruin) keeps the roof whole: only a post breaks.
+local function break_ring(pr, w, h, keep_roof_mid)
+	local keep = {}
+	for _, c in ipairs(ring_cells(w, h)) do
+		keep[ck(c[1], c[2])] = true
 	end
-	return list
+	local function drop(i, j)
+		keep[ck(i, j)] = nil
+	end
+	local function drop_post(i, from)
+		for j = from, h - 1 do
+			drop(i, j)
+		end
+	end
+	local side = pr:next(0, 1) == 0 and -1 or w     -- the side that breaks
+	local other = side == -1 and w or -1
+
+	local pattern
+	if keep_roof_mid then
+		pattern = "post"
+	else
+		local r = pr:next(1, 100)
+		pattern = r <= 30 and "roofless" or r <= 60 and "side" or r <= 85 and "both" or "chip"
+	end
+
+	if pattern == "roofless" then
+		for i = -1, w do
+			drop(i, h)
+		end
+		-- the posts weathered down a little from the top
+		drop_post(-1, h - pr:next(0, 1))
+		drop_post(w, h - pr:next(0, 1))
+	elseif pattern == "side" or pattern == "both" then
+		-- one post snapped off part way up, its top corner gone with it
+		drop_post(side, pr:next(0, h - 2))
+		drop(side, h)
+		-- the roof still hangs from the other post, partly or (for "both")
+		-- hardly at all
+		local reach = pattern == "both" and pr:next(0, 1) or pr:next(1, w)
+		local step = other == -1 and 1 or -1
+		for n = 0, w + 1 do
+			local i = other + step * n
+			if n > reach then
+				drop(i, h)
+			end
+		end
+	elseif pattern == "chip" then
+		-- a piece out of the roof; each half still rests on its post
+		local i0 = pr:next(0, w - 1)
+		drop(i0, h)
+		if pr:next(1, 100) <= 50 and i0 + 1 <= w - 1 then
+			drop(i0 + 1, h)
+		end
+		if pr:next(1, 100) <= 40 then
+			drop(side, h - 1)
+		end
+	else -- "post": a crystal ruin; only the top of one post is gone
+		drop_post(side, h - pr:next(1, math.max(1, h - 1)))
+	end
+
+	-- now and then a block of the ground row is gone too (not under a post)
+	if pr:next(1, 100) <= 30 then
+		drop(pr:next(0, w - 1), -1)
+	end
+
+	-- Nothing floats: whatever cannot reach the ground row through the
+	-- ring (orthogonally) falls away.
+	local reached, queue = {}, {}
+	for i = -1, w do
+		if keep[ck(i, -1)] then
+			reached[ck(i, -1)] = true
+			queue[#queue + 1] = {i, -1}
+		end
+	end
+	while #queue > 0 do
+		local c = table.remove(queue)
+		for _, d in ipairs({{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) do
+			local k = ck(c[1] + d[1], c[2] + d[2])
+			if keep[k] and not reached[k] then
+				reached[k] = true
+				queue[#queue + 1] = {c[1] + d[1], c[2] + d[2]}
+			end
+		end
+	end
+	return reached, pattern
 end
 
+-- ------------------------------------------------------------------
+-- Planning a ruin
+-- ------------------------------------------------------------------
 -- Decide every node. Returns a plan: {nodes = {{pos, name}...}, chest =
--- pos|nil, crystal = pos|nil, frame = {anchor, axis, w, h}}.
+-- pos|nil, crystal = pos|nil, frame = {anchor, axis, w, h}, ring = {...}}.
 local function plan_ruin(gx, gy, gz, opts, pr)
-	local kind, style = opts.kind, opts.style
+	local style, setting = opts.style, opts.setting
 	local axis = pr:next(0, 1) == 0 and "x" or "z"
 	local w, h = 2, 3
 	if style == "grand" then
@@ -220,10 +308,17 @@ local function plan_ruin(gx, gy, gz, opts, pr)
 			set[k] = #nodes
 		end
 	end
+	-- the ground under a spot, as it will be once the site is cleared
+	-- (cleared ground is never higher than gy)
+	local function floor_y(p)
+		local y = ground_at(p.x, p.z, gy + 3, gy - 4)
+		return math.min(y or gy, gy)
+	end
 
-	local base, accent = theme_node(kind, "base"), theme_node(kind, "accent")
-	local floor, corner = theme_node(kind, "floor"), theme_node(kind, "corner")
-	local plan = {frame = {anchor = a, axis = axis, w = w, h = h}, kind = kind, style = style}
+	local base, accent = setting_node(setting, "base"), setting_node(setting, "accent")
+	local floor = setting_node(setting, "floor")
+	local plan = {frame = {anchor = a, axis = axis, w = w, h = h}, style = style,
+		setting = setting}
 
 	-- clear the space the ruin stands in (grass, a sapling, a bump)
 	local pad = style == "grand" and 3 or 1
@@ -248,18 +343,16 @@ local function plan_ruin(gx, gy, gz, opts, pr)
 				end
 			end
 		end
-		-- broken pillars either side
+		-- broken pillars either side, each standing on the platform
 		for _, i in ipairs({-3, w + 2}) do
 			local top = h + 2 - pr:next(0, 3)
 			for j = 0, top do
 				put(cell(a, axis, i, j, 0), (j == top and pr:next(1, 100) <= 50) and accent or base)
 			end
 		end
-	end
-
-	-- a foundation under the frame, so a dip in the ground never shows
-	-- daylight under it
-	if style ~= "grand" then
+	else
+		-- a foundation under the frame, so a dip in the ground never shows
+		-- daylight under it
 		for i = -1, w do
 			for j = -3, -2 do
 				put(cell(a, axis, i, j), floor)
@@ -267,63 +360,55 @@ local function plan_ruin(gx, gy, gz, opts, pr)
 		end
 	end
 
-	-- the frame: sides cracked, some gone, a few still whole; corners in
-	-- the theme's stone (a frame does not need them)
-	local sides, corners = frame_cells(w, h)
-	for _, c in ipairs(corners) do
-		if pr:next(1, 100) <= 70 then
-			put(cell(a, axis, c[1], c[2]), corner)
+	-- the ring: mese only, broken so that nothing floats
+	local mid = math.floor((w - 1) / 2)
+	local crystal = opts.crystal and first_registered(CRYSTALS) or nil
+	if crystal and not minetest.registered_nodes[crystal] then
+		crystal = nil
+	end
+	local keep, pattern = break_ring(pr, w, h, crystal ~= nil)
+	plan.pattern = pattern
+	local kept = {}
+	for _, c in ipairs(ring_cells(w, h)) do
+		if keep[ck(c[1], c[2])] then
+			kept[#kept + 1] = c
+		else
+			put(cell(a, axis, c[1], c[2]), "air")
 		end
 	end
-	-- a dark ruin, very rarely, still wears its crystal; the roof block it
-	-- sits on is kept (cracked), so it is never one of the gaps
-	local mid = math.floor((w - 1) / 2)
-	local crystal = kind == "dark" and opts.crystal and first_registered(CRYSTALS)
-	if crystal and minetest.registered_nodes[crystal] then
-		for n, c in ipairs(sides) do
-			if c[1] == mid and c[2] == h then
-				table.remove(sides, n)
-				break
-			end
-		end
-		put(cell(a, axis, mid, h), CRACKED)
+	-- 1-3 of what is left is still whole mese, the rest is cracked
+	for n = #kept, 2, -1 do
+		local m = pr:next(1, n)
+		kept[n], kept[m] = kept[m], kept[n]
+	end
+	local whole = math.min(#kept, pr:next(1, 3))
+	plan.whole = whole
+	for n, c in ipairs(kept) do
+		put(cell(a, axis, c[1], c[2]), n <= whole and MESE or CRACKED)
+	end
+	if crystal and keep[ck(mid, h)] then
 		put(cell(a, axis, mid, h + 1), crystal)
 		plan.crystal = cell(a, axis, mid, h + 1)
 	end
-	shuffle(pr, sides)
-	local missing = style == "grand" and pr:next(3, 5) or pr:next(2, 4)
-	local whole = pr:next(1, 3)
-	plan.missing, plan.whole = {}, {}
-	for n, c in ipairs(sides) do
-		local p = cell(a, axis, c[1], c[2])
-		if n <= missing then
-			put(p, c[2] == -1 and floor or "air") -- a gap in the ground row shows as stone
-			plan.missing[#plan.missing + 1] = p
-		elseif n <= missing + whole then
-			put(p, MESE)
-			plan.whole[#plan.whole + 1] = p
-		else
-			put(p, CRACKED)
-		end
-	end
 
-	-- pieces that fell, and stone strewn about
-	for _ = 1, pr:next(1, 2) do
-		local i = pr:next(-2, w + 1)
-		local d = pr:next(0, 1) == 0 and -2 or 2
-		put(cell(a, axis, i, 0, d), CRACKED)
+	-- what fell lies on the ground nearby, and stone is strewn about
+	for _ = 1, pr:next(1, 3) do
+		local p = cell(a, axis, pr:next(-2, w + 1), 0, pr:next(0, 1) == 0 and -2 or 2)
+		p.y = floor_y(p) + 1
+		put(p, CRACKED)
 	end
 	for _ = 1, pr:next(3, 6) do
-		local i, d = pr:next(-pad - 1, w + pad), pr:next(-2, 2)
-		if math.abs(d) >= 1 then
-			put(cell(a, axis, i, -1, d), accent)
-		end
+		local p = cell(a, axis, pr:next(-pad - 1, w + pad), 0, pr:next(1, 2) * (pr:next(0, 1) == 0 and -1 or 1))
+		p.y = floor_y(p)
+		put(p, accent)
 	end
 
-	-- a chest at the foot of the frame
+	-- a chest at the foot of the frame, on the ground (or the platform)
 	if opts.chest then
-		local d = pr:next(0, 1) == 0 and -1 or 1
-		local p = cell(a, axis, style == "grand" and -2 or -1, 0, d)
+		local p = cell(a, axis, style == "grand" and -2 or -1, 0, pr:next(0, 1) == 0 and -1 or 1)
+		if style ~= "grand" then
+			p.y = floor_y(p) + 1
+		end
 		put(p, CHEST)
 		plan.chest = p
 	end
@@ -370,12 +455,12 @@ end
 local function roll_opts(pr, opts)
 	opts = opts or {}
 	local out = {}
-	out.kind = opts.kind or (pr:next(1, 100) <= DARK_SHARE and "dark" or "sky")
 	out.style = opts.style or (pr:next(1, 100) <= GRAND_SHARE and "grand" or "plain")
+	out.setting = opts.setting or (pr:next(1, 100) <= OBSIDIAN_SHARE and "obsidian" or "stone")
 	if opts.crystal ~= nil then
 		out.crystal = opts.crystal
 	else
-		out.crystal = out.kind == "dark" and pr:next(1, CRYSTAL_ODDS) == 1
+		out.crystal = pr:next(1, CRYSTAL_ODDS) == 1
 	end
 	if opts.chest ~= nil then
 		out.chest = opts.chest
@@ -394,14 +479,14 @@ end
 local function record(plan, gx, gy, gz)
 	local records = load_records()
 	records[gx .. "," .. gy .. "," .. gz] = {x = gx, y = gy, z = gz,
-		kind = plan.kind, style = plan.style, crystal = plan.crystal and true or nil}
+		style = plan.style, crystal = plan.crystal and true or nil}
 	storage:set_string("portal_ruins", minetest.serialize(records))
 end
 
 -- Build a ruin on the ground at (x, z), surface searched between top and
--- bottom. opts may fix kind ("sky"|"dark"), style ("plain"|"grand"),
--- crystal and chest; the rest is rolled from seed. Returns the plan, or
--- nil plus why ("retry" when the ground is not generated yet).
+-- bottom. opts may fix style ("plain"|"grand"), setting ("stone"|
+-- "obsidian"), crystal and chest; the rest is rolled from seed. Returns
+-- the plan, or nil plus why ("retry" when the ground is not generated yet).
 function lualore.portal_ruins.build_at(x, z, seed, opts, top, bottom)
 	local pr = PcgRandom(seed or (x * 73856093 + z * 19349663))
 	local o = roll_opts(pr, opts)
@@ -414,9 +499,7 @@ function lualore.portal_ruins.build_at(x, z, seed, opts, top, bottom)
 	end
 	-- The ground only has to be level-ish where the ruin stands: the frame
 	-- gets a foundation and the platform is propped up, and bumps are cut
-	-- away, so a little roughness never shows. (This was a 7 x 7 square
-	-- within 1 node, which real terrain hardly ever is, and almost no ruin
-	-- was ever built.)
+	-- away, so a little roughness never shows.
 	local r = o.style == "grand" and 4 or 2
 	local ok = level_enough(x - r, z - r, x + r, z + r, gy, o.style == "grand" and 3 or 2)
 	if ok ~= true then
@@ -434,16 +517,21 @@ function lualore.portal_ruins.build_at(x, z, seed, opts, top, bottom)
 		plan.loot = stock_chest(plan.chest, pr)
 	end
 	record(plan, x, gy, z)
-	minetest.log("action", string.format("[lualore] Ruined %s portal (%s%s) at %d,%d,%d",
-		plan.kind, plan.style, plan.crystal and ", with its crystal" or "", x, gy, z))
+	minetest.log("action", string.format("[lualore] Ruined portal (%s, %s, %s%s) at %d,%d,%d",
+		plan.style, plan.setting, plan.pattern, plan.crystal and ", with its crystal" or "",
+		x, gy, z))
 	return plan
 end
+
+-- for tests: which ring cells are left, and what the pattern was
+lualore.portal_ruins.ring_cells = ring_cells
+lualore.portal_ruins.break_ring = break_ring
 
 -- ------------------------------------------------------------------
 -- Commands
 -- ------------------------------------------------------------------
 minetest.register_chatcommand("spawn_portal_ruin", {
-	params = "[sky|dark] [plain|grand] [crystal]",
+	params = "[plain|grand] [stone|obsidian] [crystal]",
 	description = S("Raise a ruined portal where you stand"),
 	privs = {server = true},
 	func = function(name, param)
@@ -453,10 +541,10 @@ minetest.register_chatcommand("spawn_portal_ruin", {
 		end
 		local opts = {}
 		for word in param:gmatch("%S+") do
-			if word == "sky" or word == "dark" then
-				opts.kind = word
-			elseif word == "plain" or word == "grand" then
+			if word == "plain" or word == "grand" then
 				opts.style = word
+			elseif word == "stone" or word == "obsidian" then
+				opts.setting = word
 			elseif word == "crystal" then
 				opts.crystal = true
 			end
@@ -467,7 +555,8 @@ minetest.register_chatcommand("spawn_portal_ruin", {
 		if not plan then
 			return false, "No ruin here: " .. tostring(why)
 		end
-		return true, string.format("Ruined %s portal (%s) built.", plan.kind, plan.style)
+		return true, string.format("Ruined portal (%s, %s, %s) built.",
+			plan.style, plan.setting, plan.pattern)
 	end,
 })
 
@@ -490,7 +579,8 @@ minetest.register_chatcommand("find_portal_ruin", {
 		if not best then
 			return true, "No ruined portals recorded yet."
 		end
-		return true, string.format("Nearest ruined portal: %s %s at %d,%d,%d (%d nodes away)",
-			best.kind, best.style, best.x, best.y, best.z, best_d)
+		return true, string.format("Nearest ruined portal: %s at %d,%d,%d (%d nodes away)%s",
+			best.style or "?", best.x, best.y, best.z, best_d,
+			best.crystal and ", still wearing its crystal" or "")
 	end,
 })

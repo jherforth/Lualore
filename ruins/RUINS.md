@@ -20,9 +20,9 @@ tries the next type down the table before giving up on the spot.
 
 ### Ruined portals beside the ruins
 
-**Three ruins in four** of every kind have a **ruined sky or dark portal**
-standing beside them. It's a frame of mostly Cracked Mese with gaps, plain
-or on a grand broken platform, sometimes with a chest of iron ingots. It's
+**Three ruins in four** of every kind have a **ruined portal** standing
+beside them. It's a broken ring of mostly Cracked Mese, plain or on a grand
+platform of stone or obsidian, sometimes with a chest of iron ingots. It's
 built by `portal/portal_ruins.lua`; see `portal/SKY_PORTAL.md`, section 5b.
 
 - **Where it stands:** on a ring round the ruin, clear of everything the ruin
