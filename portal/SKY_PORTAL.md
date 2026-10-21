@@ -221,6 +221,32 @@ itself cannot be dug, blasted, built into or flowed into.
 Relight a repaired frame with another ingot. A portal relit with the same
 size in the same place keeps its link.
 
+## 5b. Ruined portals
+
+Dead portals stand here and there in the world, as a hint at what can be
+built: a frame of the right shape, cracked and broken. You come across
+about one per 1000 × 1000 nodes. They're on fairly level dry ground and
+never in a village.
+
+- **Two kinds.** Sky ruins are in weathered stone and mossy cobble. Dark
+  ruins are in obsidian, like the black portals to the wizard castles.
+  About 4 in 10 ruins are dark. Very rarely (one dark ruin in 8) a dark
+  ruin still wears its crystal on the roof.
+- **Two styles.**
+  - **Plain:** just the frame, sunk in the ground, with 2–4 blocks gone.
+  - **Grand:** a larger frame (3 × 4 inside) on a worn platform between two
+    broken pillars, with 3–5 blocks gone.
+- **They never work.** Most of the frame is **Cracked Mese**: it looks
+  like mese but its power is spent. It drops only 1–3 mese fragments, and
+  no portal lights through it. Each ruin keeps 1–3 blocks of real mese. To
+  make one work, replace the cracked blocks and fill the gaps with real
+  mese, then throw in an iron ingot. The shape is already right. The
+  corners are stone, since a frame doesn't need them.
+- **Chests.** About half the ruins have a chest at the foot of the frame
+  with 3–8 iron ingots (what lights a portal) and 2–5 mese fragments,
+  sometimes with an obsidian shard or a few torches. It isn't filled with
+  the biome loot village chests get.
+
 ## 6. Mirror Sentinels
 
 The former boss of the door trials is now an ordinary hostile of the sky
@@ -269,12 +295,17 @@ and buffer bounds, and emits a single 4-second `idle` animation.
 | `lualore_portal_village_houses` | 18 | Houses in a village a portal founds (6–30). The island grows to fit. |
 | `lualore_portal_max_size` | 256 | Largest interior side the frame scan follows. |
 | `lualore_mirror_sentinels` | true | Sentinels spawn on the sky islands. |
+| `lualore_portal_ruins` | true | Ruined portals are placed in newly generated land. |
+| `lualore_portal_ruin_spacing` | 700 | Size of the grid cells ruins are placed on (one candidate each). |
+| `lualore_portal_ruin_chance` | 0.5 | Chance a cell's candidate becomes a ruin. |
 
 ## 8. Commands
 
 | Command | Priv | Purpose |
 |---|---|---|
 | `/sky_portals [radius]` | — | Portals within the radius (default 128): ground or sky, size, position and where each one leads. |
+| `/spawn_portal_ruin [sky\|dark] [plain\|grand] [crystal]` | server | Raise a ruined portal a few nodes from you, for testing. |
+| `/find_portal_ruin` | server | The nearest recorded ruined portal. |
 
 ## 9. What happened to the obsidian doors
 

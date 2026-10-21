@@ -138,6 +138,7 @@ dofile(modpath .. "/valkyrie/mirror_sentinel.lua")
 --     islands and back). legacy_doors rescues players left on the old
 --     obsidian door mirror islands.
 dofile(modpath .. "/portal/sky_portal.lua")
+dofile(modpath .. "/portal/portal_ruins.lua")
 dofile(modpath .. "/portal/legacy_doors.lua")
 
 -- 8. Custom mob spawning (if exists)

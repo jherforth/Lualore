@@ -123,6 +123,17 @@ lualore_portal_delay (Sky portal delay) float 2.0 0.0 10.0
 # Only through a portal a player has already opened.
 lualore_portal_mobs (Mobs use sky portals) bool true
 
+# Ruined portals: dead sky and dark portals scattered over the world, as
+# a hint of what can be built. Mostly Cracked Mese, with gaps; a few
+# have a chest of iron ingots. See portal/SKY_PORTAL.md.
+lualore_portal_ruins (Ruined portals) bool true
+
+# Size of the grid cells ruined portals are placed on (one candidate each).
+lualore_portal_ruin_spacing (Ruined portal spacing) int 700 200 5000
+
+# Chance that a cell's candidate becomes a ruined portal.
+lualore_portal_ruin_chance (Ruined portal chance) float 0.5 0.0 1.0
+
 # Height from which a portal counts as being in the sky: portals at or
 # above it lead down, portals below it lead up, and the search for an
 # island starts here. Asuna's floatlands begin at y = 287.
