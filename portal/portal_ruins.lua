@@ -23,13 +23,12 @@
 -- 1-3 real mese blocks, and some have a chest with iron ingots (what
 -- lights a portal) and a little more.
 --
--- Placement is the grid used by the ruins and villages: one candidate per
--- SPACING x SPACING cell, kept with probability CHANCE, on fairly level
--- dry ground away from villages. Defaults make about one ruin per
--- 1000 x 1000 nodes.
+-- They are one of the ruin types (ruins/ruins.lua), so they turn up as
+-- often as the other ruins do: about a quarter of all ruins are portals.
+-- A site the portal does not fit (water, a slope, a village) gets another
+-- kind of ruin instead.
 --
--- Settings: lualore_portal_ruins (bool), lualore_portal_ruin_spacing (int),
---           lualore_portal_ruin_chance (float)
+-- Settings: lualore_portal_ruins (bool): whether ruins may be portals
 -- ===================================================================
 
 lualore = lualore or {}
@@ -38,14 +37,7 @@ lualore.portal_ruins = {}
 local S = minetest.get_translator("lualore")
 local storage = minetest.get_mod_storage()
 
-local function setting_number(key, default)
-	local v = tonumber(minetest.settings:get(key))
-	return v == nil and default or v
-end
-
-local ENABLED = minetest.settings:get_bool("lualore_portal_ruins", true)
-local SPACING = math.max(200, math.floor(setting_number("lualore_portal_ruin_spacing", 700)))
-local CHANCE = math.max(0, math.min(1, setting_number("lualore_portal_ruin_chance", 0.5)))
+lualore.portal_ruins.enabled = minetest.settings:get_bool("lualore_portal_ruins", true)
 local Y_MIN, Y_MAX = -2, 200
 
 local MESE = "default:mese"
@@ -252,7 +244,7 @@ local function plan_ruin(gx, gy, gz, opts, pr)
 				local edge = i == -4 or i == w + 3 or d == -2 or d == 2
 				if not (edge and pr:next(1, 100) <= 30) then
 					put(cell(a, axis, i, -1, d), pr:next(1, 100) <= 20 and accent or floor)
-					for j = -3, -2 do
+					for j = -4, -2 do
 						put(cell(a, axis, i, j, d), floor)
 					end
 				end
@@ -263,6 +255,16 @@ local function plan_ruin(gx, gy, gz, opts, pr)
 			local top = h + 2 - pr:next(0, 3)
 			for j = 0, top do
 				put(cell(a, axis, i, j, 0), (j == top and pr:next(1, 100) <= 50) and accent or base)
+			end
+		end
+	end
+
+	-- a foundation under the frame, so a dip in the ground never shows
+	-- daylight under it
+	if style ~= "grand" then
+		for i = -1, w do
+			for j = -3, -2 do
+				put(cell(a, axis, i, j), floor)
 			end
 		end
 	end
@@ -412,8 +414,13 @@ function lualore.portal_ruins.build_at(x, z, seed, opts, top, bottom)
 	if gy < Y_MIN or gy > Y_MAX then
 		return nil, "height"
 	end
-	local r = o.style == "grand" and 5 or 3
-	local ok = level_enough(x - r, z - r, x + r, z + r, gy, o.style == "grand" and 2 or 1)
+	-- The ground only has to be level-ish where the ruin stands: the frame
+	-- gets a foundation and the platform is propped up, and bumps are cut
+	-- away, so a little roughness never shows. (This was a 7 x 7 square
+	-- within 1 node, which real terrain hardly ever is, and almost no ruin
+	-- was ever built.)
+	local r = o.style == "grand" and 4 or 2
+	local ok = level_enough(x - r, z - r, x + r, z + r, gy, o.style == "grand" and 3 or 2)
 	if ok ~= true then
 		return nil, ok == "retry" and "retry" or "uneven"
 	end
@@ -432,77 +439,6 @@ function lualore.portal_ruins.build_at(x, z, seed, opts, top, bottom)
 	minetest.log("action", string.format("[lualore] Ruined %s portal (%s%s) at %d,%d,%d",
 		plan.kind, plan.style, plan.crystal and ", with its crystal" or "", x, gy, z))
 	return plan
-end
-
--- ------------------------------------------------------------------
--- Placement in new chunks
--- ------------------------------------------------------------------
-local function world_salt()
-	local seed = tostring(minetest.get_mapgen_setting("seed") or "")
-	local h = 5381
-	for i = 1, #seed do
-		h = (h * 33 + seed:byte(i)) % 2147483647
-	end
-	return h
-end
-local SALT
-
-local function cell_candidate(cx, cz)
-	SALT = SALT or world_salt()
-	local pr = PcgRandom((cx * 73856093 + cz * 19349663 + SALT * 83492791 + 9137) % 2147483647)
-	if pr:next(0, 999) >= CHANCE * 1000 then
-		return nil
-	end
-	local quarter = math.floor(SPACING / 4)
-	local x = cx * SPACING + quarter + pr:next(0, SPACING - 2 * quarter)
-	local z = cz * SPACING + quarter + pr:next(0, SPACING - 2 * quarter)
-	return x, z, pr:next(1, 2147483646)
-end
-
-local tried, pending = {}, {}
-
-local function attempt(cx, cz, minp, maxp)
-	local key = cx .. ":" .. cz
-	if tried[key] then
-		return
-	end
-	local x, z, seed = cell_candidate(cx, cz)
-	if not x then
-		tried[key] = true
-		return
-	end
-	local plan, why = lualore.portal_ruins.build_at(x, z, seed, nil,
-		math.min(maxp.y, Y_MAX), math.max(minp.y, Y_MIN))
-	if plan then
-		tried[key], pending[key] = true, nil
-	elseif why == "retry" then
-		-- part of the footprint is in a chunk not generated yet
-		local left = (pending[key] or 20) - 1
-		pending[key] = left > 0 and left or nil
-		if left > 0 then
-			minetest.after(1, attempt, cx, cz, minp, maxp)
-		end
-	elseif why == "covered" or why == "none" then
-		-- the ground is in another chunk of this column: it will try then
-	else
-		tried[key] = true -- water, too steep, a village: no ruin here
-	end
-end
-
-if ENABLED then
-	minetest.register_on_generated(function(minp, maxp)
-		if maxp.y < Y_MIN or minp.y > Y_MAX then
-			return
-		end
-		for cx = math.floor(minp.x / SPACING), math.floor(maxp.x / SPACING) do
-			for cz = math.floor(minp.z / SPACING), math.floor(maxp.z / SPACING) do
-				local x, z = cell_candidate(cx, cz)
-				if x and x >= minp.x and x <= maxp.x and z >= minp.z and z <= maxp.z then
-					minetest.after(0.5, attempt, cx, cz, minp, maxp)
-				end
-			end
-		end
-	end)
 end
 
 -- ------------------------------------------------------------------

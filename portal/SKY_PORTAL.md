@@ -224,9 +224,10 @@ size in the same place keeps its link.
 ## 5b. Ruined portals
 
 Dead portals stand here and there in the world, as a hint at what can be
-built: a frame of the right shape, cracked and broken. You come across
-about one per 1000 × 1000 nodes. They're on fairly level dry ground and
-never in a village.
+built: a frame of the right shape, cracked and broken. They are one of the
+ruin types (`ruins/RUINS.md`): about a quarter of all ruins are portals, so
+you come across them as often as the other ruins. They're on dry ground and
+never in a village; a site a portal won't take gets an ordinary ruin.
 
 - **Two kinds.** Sky ruins are in weathered stone and mossy cobble. Dark
   ruins are in obsidian, like the black portals to the wizard castles.
@@ -295,9 +296,7 @@ and buffer bounds, and emits a single 4-second `idle` animation.
 | `lualore_portal_village_houses` | 18 | Houses in a village a portal founds (6–30). The island grows to fit. |
 | `lualore_portal_max_size` | 256 | Largest interior side the frame scan follows. |
 | `lualore_mirror_sentinels` | true | Sentinels spawn on the sky islands. |
-| `lualore_portal_ruins` | true | Ruined portals are placed in newly generated land. |
-| `lualore_portal_ruin_spacing` | 700 | Size of the grid cells ruins are placed on (one candidate each). |
-| `lualore_portal_ruin_chance` | 0.5 | Chance a cell's candidate becomes a ruin. |
+| `lualore_portal_ruins` | true | About a quarter of the ruins are ruined portals. Their frequency follows the ruins' own settings (`lualore_ruin_spacing`, `lualore_ruin_chance`). |
 
 ## 8. Commands
 

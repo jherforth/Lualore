@@ -854,9 +854,13 @@ local function gen_stones(ctx)
 	return true
 end
 
-local TYPE_ORDER = {"castle", "tower", "walls", "stones"}
-local TYPE_INDEX = {castle = 1, tower = 2, walls = 3, stones = 4}
+-- "portal" is a ruined sky or dark portal (portal/portal_ruins.lua), which
+-- builds itself; it comes first, so a site it does not fit falls through
+-- to an ordinary ruin.
+local TYPE_ORDER = {"portal", "castle", "tower", "walls", "stones"}
+local TYPE_INDEX = {portal = 1, castle = 2, tower = 3, walls = 4, stones = 5}
 local TYPE_NAME = {
+	portal = "ruined portal",
 	castle = "broken castle",
 	tower = "ruined tower",
 	walls = "broken wall",
@@ -864,16 +868,24 @@ local TYPE_NAME = {
 }
 local GENERATORS = {castle = gen_castle, tower = gen_tower, walls = gen_walls, stones = gen_stones}
 
+local function portals_enabled()
+	return lualore.portal_ruins ~= nil and lualore.portal_ruins.build_at ~= nil
+		and lualore.portal_ruins.enabled ~= false
+end
+
+-- a quarter portals, then the old mix of the rest
 local function pick_type(pr)
 	local r = pr:next(1, 100)
-	if r <= 40 then
-		return 1
-	elseif r <= 70 then
+	if r <= 25 then
+		return portals_enabled() and 1 or 2
+	elseif r <= 55 then
 		return 2
-	elseif r <= 88 then
+	elseif r <= 78 then
 		return 3
+	elseif r <= 91 then
+		return 4
 	end
-	return 4
+	return 5
 end
 
 -- ------------------------------------------------------------------
@@ -999,12 +1011,26 @@ local function build_ruin(cx, cz, theme, seed, force_type, scan_top, scan_bottom
 		ctx.max_floor = base
 		ctx.invalid = false
 		local kind = TYPE_ORDER[idx]
-		local result = GENERATORS[kind](ctx)
-		if result == "retry" then
-			return "retry"
-		end
-		if result then
-			return true, kind, execute_plan(ctx), base
+		if kind == "portal" then
+			-- it finds its own footing round the ground found here
+			if portals_enabled() then
+				local plan, why = lualore.portal_ruins.build_at(cx, cz, seed, nil,
+					base + 6, base - 6)
+				if plan then
+					return true, kind, true, base
+				end
+				if why == "retry" then
+					return "retry"
+				end
+			end
+		else
+			local result = GENERATORS[kind](ctx)
+			if result == "retry" then
+				return "retry"
+			end
+			if result then
+				return true, kind, execute_plan(ctx), base
+			end
 		end
 	end
 
@@ -1139,7 +1165,7 @@ lualore.ruins = {
 -- Chat commands (tuning / debugging)
 -- ------------------------------------------------------------------
 minetest.register_chatcommand("spawn_ruin", {
-	params = "[castle|tower|walls|stones]",
+	params = "[portal|castle|tower|walls|stones]",
 	description = S("Build a ruin at your position (tuning aid). Default: random type."),
 	privs = {server = true},
 	func = function(name, param)
@@ -1153,7 +1179,7 @@ minetest.register_chatcommand("spawn_ruin", {
 			kind = param
 			if not TYPE_INDEX[kind] then
 				return false, "Unknown ruin type '" .. param ..
-					"' (use: castle, tower, walls, stones)"
+					"' (use: portal, castle, tower, walls, stones)"
 			end
 		end
 		local theme = theme_for_pos(pos.x, pos.z)

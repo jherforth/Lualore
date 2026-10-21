@@ -123,7 +123,7 @@ Build an upright rectangle of **mese blocks** — at least 2 wide and 3 tall ins
 
 **Dark portals.** Set a crystal on a portal's roof and it burns black. A dark portal leads down to the nearest **wizard castle**, raising one in the caves below if none is near, and the castle's wizards gather to meet you. Freed Sky Folk can trade you a crystal for the quest *The Shadow Gate*. Mobs use the portals too: lead a guardian, a villager or a valkyrie into a portal you have opened and it follows you through.
 
-**Ruined portals.** Dead sky and dark portals stand here and there in the world, a hint at what can be built: frames of mostly **Cracked Mese**, with gaps, plain or on a grand broken platform. Replace the cracked blocks and fill the gaps with real mese and they work. Some have a chest of iron ingots, and very rarely a dark one still wears its crystal.
+**Ruined portals.** About a quarter of the ruins are dead sky and dark portals, a hint at what can be built: frames of mostly **Cracked Mese**, with gaps, plain or on a grand broken platform. Replace the cracked blocks and fill the gaps with real mese and they work. Some have a chest of iron ingots, and very rarely a dark one still wears its crystal.
 
 **Mirror Sentinels** — hovering obelisk constructs that cast blinding curses — wander the sky islands. They drop mese, which is what the next portal frame is made of. `/sky_portals` lists the portals near you and where each one leads — see `portal/SKY_PORTAL.md` for the full guide.
 
