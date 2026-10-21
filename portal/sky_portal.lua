@@ -501,24 +501,82 @@ end
 -- ------------------------------------------------------------------
 -- Effects
 -- ------------------------------------------------------------------
+-- Portal particles are small motes, the size of the ones villagers give
+-- off when they meet, in the portal's own colours: blue and pale blue for
+-- the sky, grey and near-black for the dark. Each colour is its own
+-- spawner, since a spawner has one texture.
+local MOTES = {
+	sky = {
+		{texture = "default_cloud.png^[colorize:#2f6ff0:210", glow = 10},
+		{texture = "default_cloud.png^[colorize:#9fd8ff:200", glow = 12},
+	},
+	dark = {
+		{texture = "default_cloud.png^[colorize:#8c8c92:210", glow = 3},
+		{texture = "default_cloud.png^[colorize:#18181c:230", glow = 0},
+	},
+}
+
+-- Velocity ranges for motes leaving a sheet that runs along `axis`: a
+-- little along the sheet and up, mostly out of either face.
+local function mote_motion(axis, out_lo, out_hi)
+	local dx, dz = step_of(axis)
+	local along, out = 0.15, out_hi
+	local vx = dx == 1 and along or out
+	local vz = dz == 1 and along or out
+	return {x = -vx, y = out_lo, z = -vz}, {x = vx, y = 0.35, z = vz}
+end
+
+-- A burst out of the whole sheet: lighting it, arriving through it,
+-- crowning it.
 local function swirl(frame, amount)
 	local c = centre_of(frame)
 	local dx, dz = step_of(frame.axis)
+	local nx, nz = dz, dx -- across the sheet
 	local half_w, half_h = frame.w / 2, frame.h / 2
+	local minvel, maxvel = mote_motion(frame.axis, -0.1, 1.0)
+	for _, m in ipairs(MOTES[frame.dark and "dark" or "sky"]) do
+		minetest.add_particlespawner({
+			amount = math.max(4, math.floor(amount / 2)),
+			time = 1.2,
+			minpos = {x = c.x - dx * half_w - nx * 0.15, y = c.y - half_h,
+				z = c.z - dz * half_w - nz * 0.15},
+			maxpos = {x = c.x + dx * half_w + nx * 0.15, y = c.y + half_h,
+				z = c.z + dz * half_w + nz * 0.15},
+			minvel = minvel,
+			maxvel = maxvel,
+			minexptime = 1.0,
+			maxexptime = 2.2,
+			minsize = 0.25,
+			maxsize = 0.5,
+			glow = m.glow,
+			texture = m.texture,
+		})
+	end
+end
+
+-- The steady flow: a lit sheet breathes motes out of both faces all the
+-- time. Each sheet block adds a couple now and then, so a big portal gives
+-- off more without any one block costing much.
+local function motes(pos, node)
+	local axis = axis_of(node.param2)
+	local dx, dz = step_of(axis)
+	local nx, nz = dz, dx
+	local set = MOTES[node.name == DARK and "dark" or "sky"]
+	local m = set[math.random(#set)]
+	local minvel, maxvel = mote_motion(axis, 0.0, 0.6)
 	minetest.add_particlespawner({
-		amount = amount,
-		time = 1.2,
-		minpos = {x = c.x - dx * half_w, y = c.y - half_h, z = c.z - dz * half_w},
-		maxpos = {x = c.x + dx * half_w, y = c.y + half_h, z = c.z + dz * half_w},
-		minvel = {x = -0.6, y = -0.2, z = -0.6},
-		maxvel = {x = 0.6, y = 1.0, z = 0.6},
-		minexptime = 0.8,
-		maxexptime = 1.8,
-		minsize = 1.0,
-		maxsize = 2.4,
-		glow = frame.dark and 4 or 12,
-		texture = (frame.dark and "lualore_dark_portal.png" or "lualore_sky_portal.png")
-			.. "^[verticalframe:32:0",
+		amount = 3,
+		time = 1,
+		minpos = {x = pos.x - dx * 0.45 - nx * 0.1, y = pos.y - 0.45, z = pos.z - dz * 0.45 - nz * 0.1},
+		maxpos = {x = pos.x + dx * 0.45 + nx * 0.1, y = pos.y + 0.45, z = pos.z + dz * 0.45 + nz * 0.1},
+		minvel = minvel,
+		maxvel = maxvel,
+		minexptime = 1.0,
+		maxexptime = 2.0,
+		minsize = 0.2,
+		maxsize = 0.45,
+		glow = m.glow,
+		texture = m.texture,
 	})
 end
 
@@ -1674,6 +1732,17 @@ minetest.register_on_dignode(function(pos, oldnode)
 		end
 	end
 end)
+
+-- The steady flow of motes from every lit sheet near a player (ABMs only
+-- run in the active area round players).
+minetest.register_abm({
+	label = "Lualore portal motes",
+	nodenames = {PORTAL, DARK},
+	interval = 1,
+	chance = 2,
+	catch_up = false,
+	action = motes,
+})
 
 -- Backstop for frames broken some other way (explosions, WorldEdit): a
 -- sheet node whose in-plane neighbours are neither sheet nor frame has lost

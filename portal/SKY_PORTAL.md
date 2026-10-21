@@ -31,6 +31,13 @@ ingot is inside, the frame takes it and the interior fills with a swirling,
 see-through blue sheet. Drop a stack and only one ingot is used; the rest
 fall back out.
 
+A lit portal gives off a constant, thin flow of small motes from both faces
+of its sheet: blue and pale blue, or grey and near-black for a dark portal.
+Lighting it, arriving through it and crowning it send out a burst of them.
+The flow comes from an ABM on the sheet blocks, so it only runs near players,
+and each block adds only a few motes, so a big portal costs no more per
+block than a small one.
+
 The ingot is noticed by polling item entities within 12 nodes of each player
 four times a second, not by hooking the item entity itself: three Asuna mods
 re-register `__builtin:item` (`builtin_item` replaces it outright), so
